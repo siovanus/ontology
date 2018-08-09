@@ -27,7 +27,7 @@ import (
 	"github.com/ontio/ontology/common/serialization"
 )
 
-type Status uint8
+type Status int
 
 func (this *Status) Serialize(w io.Writer) error {
 	if err := serialization.WriteUint8(w, uint8(*this)); err != nil {
@@ -46,9 +46,9 @@ func (this *Status) Deserialize(r io.Reader) error {
 }
 
 type BlackListItem struct {
-	PeerPubkey string         //peerPubkey in black list
-	Address    common.Address //the owner of this peer
-	InitPos    uint64         //initPos of this peer
+	PeerPubkey string
+	Address    common.Address
+	InitPos    uint64
 }
 
 func (this *BlackListItem) Serialize(w io.Writer) error {
@@ -129,12 +129,12 @@ func (this *PeerPoolMap) Deserialize(r io.Reader) error {
 }
 
 type PeerPoolItem struct {
-	Index      uint32         //peer index
-	PeerPubkey string         //peer pubkey
-	Address    common.Address //peer owner
-	Status     Status         //peer status
-	InitPos    uint64         //peer initPos
-	TotalPos   uint64         //total authorize pos this peer received
+	Index      uint32
+	PeerPubkey string
+	Address    common.Address
+	Status     Status
+	InitPos    uint64
+	TotalPos   uint64
 }
 
 func (this *PeerPoolItem) Serialize(w io.Writer) error {
@@ -196,14 +196,14 @@ func (this *PeerPoolItem) Deserialize(r io.Reader) error {
 }
 
 type AuthorizeInfo struct {
-	PeerPubkey           string
-	Address              common.Address
-	ConsensusPos         uint64 //pos deposit in consensus node
-	CandidatePos         uint64 //pos deposit in candidate node
-	NewPos               uint64 //deposit new pos to consensus or candidate node, it will be calculated in next epoch, you can withdrawal it at any time
-	WithdrawConsensusPos uint64 //unAuthorized pos from consensus pos, frozen until next next epoch
-	WithdrawCandidatePos uint64 //unAuthorized pos from candidate pos, frozen until next epoch
-	WithdrawUnfreezePos  uint64 //unfrozen pos, can withdraw at any time
+	PeerPubkey          string
+	Address             common.Address
+	ConsensusPos        uint64
+	FreezePos           uint64
+	NewPos              uint64
+	WithdrawPos         uint64
+	WithdrawFreezePos   uint64
+	WithdrawUnfreezePos uint64
 }
 
 func (this *AuthorizeInfo) Serialize(w io.Writer) error {
@@ -216,17 +216,17 @@ func (this *AuthorizeInfo) Serialize(w io.Writer) error {
 	if err := serialization.WriteUint64(w, this.ConsensusPos); err != nil {
 		return fmt.Errorf("serialization.WriteUint64, serialize consensusPos error: %v", err)
 	}
-	if err := serialization.WriteUint64(w, this.CandidatePos); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize candidatePos error: %v", err)
+	if err := serialization.WriteUint64(w, this.FreezePos); err != nil {
+		return fmt.Errorf("serialization.WriteUint64, serialize freezePos error: %v", err)
 	}
 	if err := serialization.WriteUint64(w, this.NewPos); err != nil {
 		return fmt.Errorf("serialization.WriteUint64, serialize newPos error: %v", err)
 	}
-	if err := serialization.WriteUint64(w, this.WithdrawConsensusPos); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize withdrawConsensusPos error: %v", err)
+	if err := serialization.WriteUint64(w, this.WithdrawPos); err != nil {
+		return fmt.Errorf("serialization.WriteUint64, serialize withDrawPos error: %v", err)
 	}
-	if err := serialization.WriteUint64(w, this.WithdrawCandidatePos); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize withdrawCandidatePos error: %v", err)
+	if err := serialization.WriteUint64(w, this.WithdrawFreezePos); err != nil {
+		return fmt.Errorf("serialization.WriteUint64, serialize withDrawFreezePos error: %v", err)
 	}
 	if err := serialization.WriteUint64(w, this.WithdrawUnfreezePos); err != nil {
 		return fmt.Errorf("serialization.WriteUint64, serialize withDrawUnfreezePos error: %v", err)
@@ -248,21 +248,21 @@ func (this *AuthorizeInfo) Deserialize(r io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("serialization.ReadUint64. deserialize consensusPos error: %v", err)
 	}
-	candidatePos, err := serialization.ReadUint64(r)
+	freezePos, err := serialization.ReadUint64(r)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64. deserialize candidatePos error: %v", err)
+		return fmt.Errorf("serialization.ReadUint64. deserialize freezePos error: %v", err)
 	}
 	newPos, err := serialization.ReadUint64(r)
 	if err != nil {
 		return fmt.Errorf("serialization.ReadUint64. deserialize newPos error: %v", err)
 	}
-	withDrawConsensusPos, err := serialization.ReadUint64(r)
+	withDrawPos, err := serialization.ReadUint64(r)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64. deserialize withDrawConsensusPos error: %v", err)
+		return fmt.Errorf("serialization.ReadUint64. deserialize withDrawPos error: %v", err)
 	}
-	withDrawCandidatePos, err := serialization.ReadUint64(r)
+	withDrawFreezePos, err := serialization.ReadUint64(r)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64. deserialize withDrawCandidatePos error: %v", err)
+		return fmt.Errorf("serialization.ReadUint64. deserialize withDrawFreezePos error: %v", err)
 	}
 	withDrawUnfreezePos, err := serialization.ReadUint64(r)
 	if err != nil {
@@ -271,10 +271,10 @@ func (this *AuthorizeInfo) Deserialize(r io.Reader) error {
 	this.PeerPubkey = peerPubkey
 	this.Address = *address
 	this.ConsensusPos = consensusPos
-	this.CandidatePos = candidatePos
+	this.FreezePos = freezePos
 	this.NewPos = newPos
-	this.WithdrawConsensusPos = withDrawConsensusPos
-	this.WithdrawCandidatePos = withDrawCandidatePos
+	this.WithdrawPos = withDrawPos
+	this.WithdrawFreezePos = withDrawFreezePos
 	this.WithdrawUnfreezePos = withDrawUnfreezePos
 	return nil
 }
@@ -323,7 +323,7 @@ func (this *GovernanceView) Deserialize(r io.Reader) error {
 	return nil
 }
 
-type TotalStake struct { //table record each address's total stake in this contract
+type TotalStake struct {
 	Address    common.Address
 	Stake      uint64
 	TimeOffset uint32
@@ -362,12 +362,12 @@ func (this *TotalStake) Deserialize(r io.Reader) error {
 	return nil
 }
 
-type PenaltyStake struct { //table record penalty stake of peer
-	PeerPubkey   string //peer pubKey of penalty stake
-	InitPos      uint64 //initPos penalty
-	AuthorizePos uint64 //authorize pos penalty
-	TimeOffset   uint32 //time used for calculate unbound ong
-	Amount       uint64 //unbound ong that this penalty unbounded
+type PenaltyStake struct {
+	PeerPubkey   string
+	InitPos      uint64
+	AuthorizePos uint64
+	TimeOffset   uint32
+	Amount       uint64
 }
 
 func (this *PenaltyStake) Serialize(w io.Writer) error {
@@ -422,37 +422,32 @@ type CandidateSplitInfo struct {
 	PeerPubkey string
 	Address    common.Address
 	InitPos    uint64
-	Stake      uint64 //total stake, init pos + total pos
-	S          uint64 //fee split weight of this peer
+	Stake      uint64
+	S          uint64
+}
+
+type SyncNodeSplitInfo struct {
+	PeerPubkey string
+	Address    common.Address
+	InitPos    uint64
+	S          uint64
 }
 
 type PeerAttributes struct {
-	PeerPubkey   string
-	MaxAuthorize uint64 //max authorzie pos this peer can receive(number of ont), set by peer owner
-	T2PeerCost   uint64 //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T + 2
-	T1PeerCost   uint64 //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T + 1
-	TPeerCost    uint64 //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T
-	Field1       []byte //reserved field
-	Field2       []byte //reserved field
-	Field3       []byte //reserved field
-	Field4       []byte //reserved field
+	PeerPubkey  string
+	IfAuthorize bool
+	Field1      []byte
+	Field2      []byte
+	Field3      []byte
+	Field4      []byte
 }
 
 func (this *PeerAttributes) Serialize(w io.Writer) error {
 	if err := serialization.WriteString(w, this.PeerPubkey); err != nil {
 		return fmt.Errorf("serialization.WriteBool, serialize peerPubkey error: %v", err)
 	}
-	if err := serialization.WriteUint64(w, this.MaxAuthorize); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize maxAuthorize error: %v", err)
-	}
-	if err := serialization.WriteUint64(w, this.T2PeerCost); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize oldPeerCost error: %v", err)
-	}
-	if err := serialization.WriteUint64(w, this.T1PeerCost); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize newPeerCost error: %v", err)
-	}
-	if err := serialization.WriteUint64(w, this.TPeerCost); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize newPeerCost error: %v", err)
+	if err := serialization.WriteBool(w, this.IfAuthorize); err != nil {
+		return fmt.Errorf("serialization.WriteBool, serialize ifAuthorize error: %v", err)
 	}
 	if err := serialization.WriteVarBytes(w, this.Field1); err != nil {
 		return fmt.Errorf("serialization.WriteVarBytes, serialize field1 error: %v", err)
@@ -474,21 +469,9 @@ func (this *PeerAttributes) Deserialize(r io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("serialization.ReadString, deserialize peerPubkey error: %v", err)
 	}
-	maxAuthorize, err := serialization.ReadUint64(r)
+	ifAuthorize, err := serialization.ReadBool(r)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadBool, deserialize maxAuthorize error: %v", err)
-	}
-	t2PeerCost, err := serialization.ReadUint64(r)
-	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64, deserialize t2PeerCost error: %v", err)
-	}
-	t1PeerCost, err := serialization.ReadUint64(r)
-	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64, deserialize t1PeerCost error: %v", err)
-	}
-	tPeerCost, err := serialization.ReadUint64(r)
-	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64, deserialize tPeerCost error: %v", err)
+		return fmt.Errorf("serialization.ReadBool, deserialize ifAuthorize error: %v", err)
 	}
 	field1, err := serialization.ReadVarBytes(r)
 	if err != nil {
@@ -507,43 +490,10 @@ func (this *PeerAttributes) Deserialize(r io.Reader) error {
 		return fmt.Errorf("serialization.ReadVarBytes. deserialize field4 error: %v", err)
 	}
 	this.PeerPubkey = peerPubkey
-	this.MaxAuthorize = maxAuthorize
-	this.T2PeerCost = t2PeerCost
-	this.T1PeerCost = t1PeerCost
-	this.TPeerCost = tPeerCost
+	this.IfAuthorize = ifAuthorize
 	this.Field1 = field1
 	this.Field2 = field2
 	this.Field3 = field3
 	this.Field4 = field4
-	return nil
-}
-
-type SplitFeeAddress struct { //table record each address's ong motivation
-	Address common.Address
-	Amount  uint64
-}
-
-func (this *SplitFeeAddress) Serialize(w io.Writer) error {
-	if err := this.Address.Serialize(w); err != nil {
-		return fmt.Errorf("address.Serialize, serialize address error: %v", err)
-	}
-	if err := serialization.WriteUint64(w, this.Amount); err != nil {
-		return fmt.Errorf("serialization.WriteUint64, serialize amount error: %v", err)
-	}
-	return nil
-}
-
-func (this *SplitFeeAddress) Deserialize(r io.Reader) error {
-	address := new(common.Address)
-	err := address.Deserialize(r)
-	if err != nil {
-		return fmt.Errorf("address.Deserialize, deserialize address error: %v", err)
-	}
-	amount, err := serialization.ReadUint64(r)
-	if err != nil {
-		return fmt.Errorf("serialization.ReadUint64, deserialize amount error: %v", err)
-	}
-	this.Address = *address
-	this.Amount = amount
 	return nil
 }
