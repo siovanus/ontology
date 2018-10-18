@@ -37,7 +37,6 @@ import (
 	"github.com/ontio/ontology/smartcontract"
 	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native/global_params"
-	ninit "github.com/ontio/ontology/smartcontract/service/native/init"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/neovm"
@@ -121,8 +120,7 @@ func (self *StateStore) HandleDeployTransaction(store store.LedgerStore, overlay
 func (self *StateStore) HandleInvokeTransaction(store store.LedgerStore, overlay *overlaydb.OverlayDB,
 	tx *types.Transaction, block *types.Block, notify *event.ExecuteNotify) error {
 	invoke := tx.Payload.(*payload.InvokeCode)
-	code := invoke.Code
-	sysTransFlag := bytes.Compare(code, ninit.COMMIT_DPOS_BYTES) == 0 || block.Header.Height == 0
+	sysTransFlag := block.Header.Height == 0
 
 	isCharge := !sysTransFlag && tx.GasPrice != 0
 
