@@ -139,9 +139,9 @@ func InitConfig(native *native.NativeService) ([]byte, error) {
 	//init globalParam
 	globalParam := &GlobalParam{
 		CandidateFeeSplitNum: 49,
-		A:            50,
-		B:            50,
-		Yita:         5,
+		A:                    50,
+		B:                    50,
+		Yita:                 5,
 	}
 	err = putGlobalParam(native, contract, globalParam)
 	if err != nil {
