@@ -34,9 +34,9 @@ import (
 	"github.com/ontio/ontology/core/utils"
 	"github.com/ontio/ontology/smartcontract/service/native/global_params"
 	"github.com/ontio/ontology/smartcontract/service/native/governance"
-	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	nutils "github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/neovm"
+	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 )
 
 const (
@@ -45,10 +45,8 @@ const (
 )
 
 var (
-	ONTToken   = newGoverningToken()
-	ONGToken   = newUtilityToken()
-	ONTTokenID = ONTToken.Hash()
-	ONGTokenID = ONGToken.Hash()
+	ONGXToken   = newUtilityToken()
+	ONGXTokenID = ONGXToken.Hash()
 )
 
 var GenBlockTime = (config.DEFAULT_GEN_BLOCK_TIME * time.Second)
@@ -92,7 +90,6 @@ func BuildGenesisBlock(defaultBookkeeper []keypair.PublicKey, genesisConfig *con
 	}
 
 	//block
-	ont := newGoverningToken()
 	ong := newUtilityToken()
 	param := newParamContract()
 	oid := deployOntIDContract()
@@ -102,13 +99,11 @@ func BuildGenesisBlock(defaultBookkeeper []keypair.PublicKey, genesisConfig *con
 	genesisBlock := &types.Block{
 		Header: genesisHeader,
 		Transactions: []*types.Transaction{
-			ont,
 			ong,
 			param,
 			oid,
 			auth,
 			config,
-			newGoverningInit(),
 			newUtilityInit(),
 			newParamInit(),
 			govConfig,
@@ -116,16 +111,6 @@ func BuildGenesisBlock(defaultBookkeeper []keypair.PublicKey, genesisConfig *con
 	}
 	genesisBlock.RebuildMerkleRoot()
 	return genesisBlock, nil
-}
-
-func newGoverningToken() *types.Transaction {
-	mutable := utils.NewDeployTransaction(nutils.OntContractAddress[:], "ONT", "1.0",
-		"Ontology Team", "contact@ont.io", "Ontology Network ONT Token", true)
-	tx, err := mutable.IntoImmutable()
-	if err != nil {
-		panic("constract genesis governing token transaction error ")
-	}
-	return tx
 }
 
 func newUtilityToken() *types.Transaction {
@@ -179,43 +164,8 @@ func deployOntIDContract() *types.Transaction {
 	return tx
 }
 
-func newGoverningInit() *types.Transaction {
-	bookkeepers, _ := config.DefConfig.GetBookkeepers()
-
-	var addr common.Address
-	if len(bookkeepers) == 1 {
-		addr = types.AddressFromPubKey(bookkeepers[0])
-	} else {
-		m := (5*len(bookkeepers) + 6) / 7
-		temp, err := types.AddressFromMultiPubKeys(bookkeepers, m)
-		if err != nil {
-			panic(fmt.Sprint("wrong bookkeeper config, caused by", err))
-		}
-		addr = temp
-	}
-
-	distribute := []struct {
-		addr  common.Address
-		value uint64
-	}{{addr, constants.ONT_TOTAL_SUPPLY}}
-
-	args := bytes.NewBuffer(nil)
-	nutils.WriteVarUint(args, uint64(len(distribute)))
-	for _, part := range distribute {
-		nutils.WriteAddress(args, part.addr)
-		nutils.WriteVarUint(args, part.value)
-	}
-
-	mutable := utils.BuildNativeTransaction(nutils.OntContractAddress, ont.INIT_NAME, args.Bytes())
-	tx, err := mutable.IntoImmutable()
-	if err != nil {
-		panic("constract genesis governing token transaction error ")
-	}
-	return tx
-}
-
 func newUtilityInit() *types.Transaction {
-	mutable := utils.BuildNativeTransaction(nutils.OngContractAddress, ont.INIT_NAME, []byte{})
+	mutable := utils.BuildNativeTransaction(nutils.OngContractAddress, ongx.INIT_NAME, []byte{})
 	tx, err := mutable.IntoImmutable()
 	if err != nil {
 		panic("constract genesis governing token transaction error ")

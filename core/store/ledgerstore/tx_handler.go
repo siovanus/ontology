@@ -37,11 +37,11 @@ import (
 	"github.com/ontio/ontology/smartcontract"
 	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native/global_params"
-	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/neovm"
 	"github.com/ontio/ontology/smartcontract/storage"
 	ntypes "github.com/ontio/ontology/vm/neovm/types"
+	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 )
 
 //HandleDeployTransaction deal with smart contract deploy transaction
@@ -254,7 +254,7 @@ func SaveNotify(eventStore scommon.EventStore, txHash common.Uint256, notify *ev
 }
 
 func genNativeTransferCode(from, to common.Address, value uint64) []byte {
-	transfer := ont.Transfers{States: []ont.State{{From: from, To: to, Value: value}}}
+	transfer := ongx.Transfers{States: []ongx.State{{From: from, To: to, Value: value}}}
 	tr := new(bytes.Buffer)
 	transfer.Serialize(tr)
 	return tr.Bytes()
@@ -348,7 +348,7 @@ func getBalanceFromNative(config *smartcontract.Config, cache *storage.CacheDB, 
 	}
 
 	service, _ := sc.NewNativeService()
-	result, err := service.NativeCall(utils.OngContractAddress, ont.BALANCEOF_NAME, bf.Bytes())
+	result, err := service.NativeCall(utils.OngContractAddress, ongx.BALANCEOF_NAME, bf.Bytes())
 	if err != nil {
 		return 0, err
 	}

@@ -28,9 +28,9 @@ import (
 	vbftconfig "github.com/ontio/ontology/consensus/vbft/config"
 	cstates "github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/smartcontract/service/native"
-	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
+	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 )
 
 func GetPeerPoolMap(native *native.NativeService, contract common.Address) (*PeerPoolMap, error) {
@@ -308,13 +308,13 @@ func appCallTransferOng(native *native.NativeService, from common.Address, to co
 }
 
 func appCallTransfer(native *native.NativeService, contract common.Address, from common.Address, to common.Address, amount uint64) error {
-	var sts []ont.State
-	sts = append(sts, ont.State{
+	var sts []ongx.State
+	sts = append(sts, ongx.State{
 		From:  from,
 		To:    to,
 		Value: amount,
 	})
-	transfers := ont.Transfers{
+	transfers := ongx.Transfers{
 		States: sts,
 	}
 	sink := common.NewZeroCopySink(nil)
