@@ -47,23 +47,19 @@ func RegisterOngContract(native *native.NativeService) {
 	native.Register(ALLOWANCE_NAME, OngxAllowance)
 	native.Register(INFLATION_NAME, OngxInflation)
 	native.Register(SWAP_NAME, OngxSwap)
+	native.Register(SET_SYNC_ADDR_NAME, OngxSetSyncAddr)
 }
 
 func OngxInit(native *native.NativeService) ([]byte, error) {
-	contract := native.ContextRef.CurrentContext().ContractAddress
-	amount, err := utils.GetStorageUInt64(native, GenTotalSupplyKey(contract))
+	key := append(native.ContextRef.CurrentContext().ContractAddress[:], ONGX_ADDRESS...)
+	result, err := native.CacheDB.Get(key)
 	if err != nil {
-		return utils.BYTE_FALSE, err
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxInit] get address from cache error:%s", err)
 	}
-
-	if amount > 0 {
-		return utils.BYTE_FALSE, errors.NewErr("Init ong has been completed!")
+	if len(result) != 0 {
+		return utils.BYTE_FALSE, errors.NewErr("[OngxInit] ongx address has existed!")
 	}
-
-	item := utils.GenUInt64StorageItem(constants.ONG_TOTAL_SUPPLY)
-	native.CacheDB.Put(GenTotalSupplyKey(contract), item.ToArray())
-	native.CacheDB.Put(append(contract[:], utils.OntContractAddress[:]...), item.ToArray())
-	AddNotifications(native, contract, &State{To: utils.OntContractAddress, Value: constants.ONG_TOTAL_SUPPLY})
+	native.CacheDB.Put(key, native.Input)
 	return utils.BYTE_TRUE, nil
 }
 
@@ -158,10 +154,88 @@ func OngxAllowance(native *native.NativeService) ([]byte, error) {
 	return GetBalanceValue(native, APPROVE_FLAG)
 }
 
+func OngxSetSyncAddr(native *native.NativeService) ([]byte, error) {
+	context := native.ContextRef.CurrentContext().ContractAddress[:]
+	key := append(context, ONGX_ADDRESS...)
+	result, err := native.CacheDB.Get(key)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSyncAddress] get address from cache error:%s", err)
+	}
+	addr, err := common.AddressParseFromBytes(result)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSyncAddress] address from bytes error:%s", err)
+	}
+	if !native.ContextRef.CheckWitness(addr) {
+		return utils.BYTE_FALSE, errors.NewErr("[OngxSyncAddress] authentication failed!")
+	}
+	native.CacheDB.Put(append(context, SYNC_ADDRESS...), native.Input)
+	return utils.BYTE_TRUE, nil
+}
+
 func OngxInflation(native *native.NativeService) ([]byte, error) {
-	return nil, nil
+	context := native.ContextRef.CurrentContext().ContractAddress
+	key := append(context[:], SYNC_ADDRESS...)
+	result, err := native.CacheDB.Get(key)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxInflation] get address from cache error:%s", err)
+	}
+	addr, err := common.AddressParseFromBytes(result)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxInflation] address from bytes error:%s", err)
+	}
+	if !native.ContextRef.CheckWitness(addr) {
+		return utils.BYTE_FALSE, errors.NewErr("[OngxInflation] authentication failed!")
+	}
+	source := common.NewZeroCopySource(native.Input)
+	var infs Inflations
+	if err := infs.Deserialize(source); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxInflation] error:%s", err)
+	}
+	totalSupplyKey := GenTotalSupplyKey(context)
+	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxInflation] error:%s", err)
+	}
+	for _, v:= range infs.Inflations {
+		key := append(context[:], v.Addr[:]...)
+		balance, err := utils.GetStorageUInt64(native, key)
+		if err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("[OngxInflation] error:%s", err)
+		}
+		native.CacheDB.Put(key, GetToUInt64StorageItem(balance, v.Value).ToArray())
+		amount += v.Value
+		AddNotifications(native, context, &State{To: v.Addr, Value: v.Value})
+	}
+	native.CacheDB.Put(key, utils.GenUInt64StorageItem(amount).ToArray())
+	return utils.BYTE_TRUE, nil
 }
 
 func OngxSwap(native *native.NativeService) ([]byte, error) {
-	return nil, nil
+	context := native.ContextRef.CurrentContext().ContractAddress
+	source := common.NewZeroCopySource(native.Input)
+	var swap Swap
+	if err := swap.Deserialize(source); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+	}
+	if !native.ContextRef.CheckWitness(swap.Addr) {
+		return utils.BYTE_FALSE, errors.NewErr("[OngxSwap] authentication failed!")
+	}
+	key := append(context[:], swap.Addr[:]...)
+	balance, err := utils.GetStorageUInt64(native, key)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+	}
+	if swap.Value > balance {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] swap ongx balance insufficient! have %d, want %d", balance, swap.Value)
+	} else if swap.Value == balance {
+		native.CacheDB.Delete(key)
+	} else {
+		native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance-swap.Value).ToArray())
+	}
+	AddNotifications(native, context, &State{From: swap.Addr, Value: swap.Value})
+
+	totalSupplyKey := GenTotalSupplyKey(context)
+	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
+	native.CacheDB.Put(key, utils.GenUInt64StorageItem(amount-swap.Value).ToArray())
+	return utils.BYTE_TRUE, nil
 }

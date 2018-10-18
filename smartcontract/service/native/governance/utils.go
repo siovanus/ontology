@@ -28,9 +28,9 @@ import (
 	vbftconfig "github.com/ontio/ontology/consensus/vbft/config"
 	cstates "github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/smartcontract/service/native"
+	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
-	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 )
 
 func GetPeerPoolMap(native *native.NativeService, contract common.Address) (*PeerPoolMap, error) {

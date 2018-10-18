@@ -35,6 +35,7 @@ import (
 	"github.com/ontio/ontology/core/types"
 	httpcom "github.com/ontio/ontology/http/base/common"
 	rpccommon "github.com/ontio/ontology/http/base/common"
+	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/wasmvm"
 	cstates "github.com/ontio/ontology/smartcontract/states"
@@ -44,7 +45,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"github.com/ontio/ontology/smartcontract/service/native/ongx"
 )
 
 const (

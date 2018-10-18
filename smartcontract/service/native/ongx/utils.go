@@ -49,9 +49,15 @@ const (
 	ALLOWANCE_NAME      = "allowance"
 	INFLATION_NAME      = "inflation"
 	SWAP_NAME           = "swap"
+	SET_SYNC_ADDR_NAME  = "setSyncAddr"
 
 	TRANSFER_FLAG byte = 1
 	APPROVE_FLAG  byte = 2
+)
+
+var (
+	ONGX_ADDRESS        = []byte("ongxAddress")
+	SYNC_ADDRESS        = []byte("syncAddress")
 )
 
 func GetBalanceValue(native *native.NativeService, flag byte) ([]byte, error) {
@@ -144,14 +150,6 @@ func TransferedFrom(native *native.NativeService, currentContract common.Address
 		return 0, 0, err
 	}
 	return fromBalance, toBalance, nil
-}
-
-func getUnboundOffset(native *native.NativeService, contract, address common.Address) (uint32, error) {
-	offset, err := utils.GetStorageUInt32(native, genAddressUnboundOffsetKey(contract, address))
-	if err != nil {
-		return 0, err
-	}
-	return offset, nil
 }
 
 func genTransferFromKey(contract common.Address, state *TransferFrom) []byte {
