@@ -206,7 +206,7 @@ func OngxInflation(native *native.NativeService) ([]byte, error) {
 		amount += v.Value
 		AddNotifications(native, context, &State{To: v.Addr, Value: v.Value})
 	}
-	native.CacheDB.Put(key, utils.GenUInt64StorageItem(amount).ToArray())
+	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount).ToArray())
 	return utils.BYTE_TRUE, nil
 }
 
@@ -236,6 +236,6 @@ func OngxSwap(native *native.NativeService) ([]byte, error) {
 
 	totalSupplyKey := GenTotalSupplyKey(context)
 	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
-	native.CacheDB.Put(key, utils.GenUInt64StorageItem(amount-swap.Value).ToArray())
+	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount-swap.Value).ToArray())
 	return utils.BYTE_TRUE, nil
 }
