@@ -236,6 +236,9 @@ func OngxSwap(native *native.NativeService) ([]byte, error) {
 
 	totalSupplyKey := GenTotalSupplyKey(context)
 	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+	}
 	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount-swap.Value).ToArray())
 	return utils.BYTE_TRUE, nil
 }
