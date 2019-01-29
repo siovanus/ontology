@@ -214,43 +214,69 @@ func (this *TransferFrom) Deserialization(source *common.ZeroCopySource) error {
 	return err
 }
 
-type OngSwapParam struct {
-	Swap []Swap
+type OngUnlockParam struct {
+	Addr   common.Address
+	TxHash common.Uint256
+	Value  uint64
+	Proof  [][]byte
 }
 
-func (this *OngSwapParam) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeVarUint(sink, uint64(len(this.Swap)))
-	for _, v := range this.Swap {
-		v.Serialization(sink)
+func (this *OngUnlockParam) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeAddress(sink, this.Addr)
+	utils.EncodeUint256(sink, this.TxHash)
+	utils.EncodeVarUint(sink, this.Value)
+	utils.EncodeVarUint(sink, uint64(len(this.Proof)))
+	for _, v := range this.Proof {
+		sink.WriteVarBytes(v)
 	}
 }
 
-func (this *OngSwapParam) Deserialization(source *common.ZeroCopySource) error {
+func (this *OngUnlockParam) Deserialization(source *common.ZeroCopySource) error {
+	addr, err := utils.DecodeAddress(source)
+	if err != nil {
+		return fmt.Errorf("OngUnlockParam deserialize addr error:%s", err)
+	}
+	txHash, err := utils.DecodeUint256(source)
+	if err != nil {
+		return fmt.Errorf("OngUnlockParam deserialize txHash error:%s", err)
+	}
+	value, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("OngUnlockParam deserialize value error:%s", err)
+	}
 	n, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("ongSwapParam deserialize count error:%s", err)
+		return fmt.Errorf("OngUnlockParam deserialize proof count error:%s", err)
 	}
+	var proof [][]byte
 	for i := 0; uint64(i) < n; i++ {
-		var swap Swap
-		if err := swap.Deserialization(source); err != nil {
-			return err
+		v, _, irregular, eof := source.NextVarBytes()
+		if eof {
+			return io.ErrUnexpectedEOF
 		}
-		this.Swap = append(this.Swap, swap)
+		if irregular {
+			return common.ErrIrregularData
+		}
+		proof = append(proof, v)
 	}
+	this.Addr = addr
+	this.TxHash = txHash
+	this.Value = value
+	this.Proof = proof
 	return nil
 }
 
-type Swap struct {
+type OngxLockParam struct {
 	Addr  common.Address
 	Value uint64
 }
 
-func (this *Swap) Serialization(sink *common.ZeroCopySink) {
+func (this *OngxLockParam) Serialization(sink *common.ZeroCopySink) {
 	utils.EncodeAddress(sink, this.Addr)
 	utils.EncodeVarUint(sink, this.Value)
 }
 
-func (this *Swap) Deserialization(source *common.ZeroCopySource) error {
+func (this *OngxLockParam) Deserialization(source *common.ZeroCopySource) error {
 	var err error
 	this.Addr, err = utils.DecodeAddress(source)
 	if err != nil {

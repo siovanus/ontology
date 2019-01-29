@@ -198,15 +198,7 @@ func InitConfig(native *native.NativeService) ([]byte, error) {
 func CommitDpos(native *native.NativeService) ([]byte, error) {
 	contract := native.ContextRef.CurrentContext().ContractAddress
 
-	address, err := getSyncAddress(native)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("getSyncAddress, get syncAddress error: %v", err)
-	}
-	//check witness
-	err = utils.ValidateOwner(native, address)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("validateOwner, checkWitness error: %v", err)
-	}
+	//TODO:auth check
 	splitFee(native, contract)
 
 	commitDposParam := new(CommitDposParam)

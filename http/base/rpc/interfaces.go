@@ -523,7 +523,11 @@ func GetMPTProof(params []interface{}) map[string]interface{} {
 	if !ok {
 		return responsePack(berr.INVALID_PARAMS, "")
 	}
-	prove, err := bactor.GetMPTPrrof([]byte(str))
+	key, err := hex.DecodeString(str)
+	if err != nil {
+		return responsePack(berr.INVALID_PARAMS, err)
+	}
+	prove, err := bactor.GetMPTPrrof(key)
 	if err != nil {
 		return responsePack(berr.INTERNAL_ERROR, err)
 	}

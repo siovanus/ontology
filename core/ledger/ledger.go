@@ -28,9 +28,9 @@ import (
 	"github.com/ontio/ontology/core/store"
 	"github.com/ontio/ontology/core/store/ledgerstore"
 	"github.com/ontio/ontology/core/types"
+	"github.com/ontio/ontology/rlp"
 	"github.com/ontio/ontology/smartcontract/event"
 	cstate "github.com/ontio/ontology/smartcontract/states"
-	"github.com/ontio/ontology/rlp"
 )
 
 var DefLedger *Ledger
@@ -173,7 +173,7 @@ func (self *Ledger) GetMerkleProof(proofHeight, rootHeight uint32) ([]common.Uin
 	return self.ldgStore.GetMerkleProof(proofHeight, rootHeight)
 }
 
-func (self *Ledger) GetMPTProof(key []byte) ([]rlp.RawValue , error) {
+func (self *Ledger) GetMPTProof(key []byte) ([]rlp.RawValue, error) {
 	return self.ldgStore.GetMPTProof(key)
 }
 

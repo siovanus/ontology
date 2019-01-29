@@ -25,9 +25,9 @@ import (
 	"github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/core/store/overlaydb"
 	"github.com/ontio/ontology/core/types"
+	"github.com/ontio/ontology/rlp"
 	"github.com/ontio/ontology/smartcontract/event"
 	cstates "github.com/ontio/ontology/smartcontract/states"
-	"github.com/ontio/ontology/rlp"
 )
 
 type ExecuteResult struct {
@@ -60,7 +60,7 @@ type LedgerStore interface {
 	IsContainTransaction(txHash common.Uint256) (bool, error)
 	GetBlockRootWithNewTxRoot(txRoot common.Uint256) common.Uint256
 	GetMerkleProof(m, n uint32) ([]common.Uint256, error)
-	GetMPTProof(key []byte) ([]rlp.RawValue , error)
+	GetMPTProof(key []byte) ([]rlp.RawValue, error)
 	GetContractState(contractHash common.Address) (*payload.DeployCode, error)
 	GetBookkeeperState() (*states.BookkeeperState, error)
 	GetStorageItem(key *states.StorageKey) (*states.StorageItem, error)

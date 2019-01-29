@@ -34,29 +34,6 @@ import (
 	"github.com/ontio/ontology/vm/neovm/types"
 )
 
-const (
-	TOTAL_SUPPLY_NAME  = "totalSupply"
-	TRANSFER_NAME      = "transfer"
-	APPROVE_NAME       = "approve"
-	TRANSFERFROM_NAME  = "transferFrom"
-	NAME_NAME          = "name"
-	SYMBOL_NAME        = "symbol"
-	DECIMALS_NAME      = "decimals"
-	TOTALSUPPLY_NAME   = "totalSupply"
-	BALANCEOF_NAME     = "balanceOf"
-	ALLOWANCE_NAME     = "allowance"
-	ONG_SWAP           = "ongSwap"
-	ONGX_SWAP          = "ongxSwap"
-	SET_SYNC_ADDR_NAME = "setSyncAddr"
-
-	TRANSFER_FLAG byte = 1
-	APPROVE_FLAG  byte = 2
-)
-
-var (
-	SYNC_ADDRESS = []byte("syncAddress")
-)
-
 func GetBalanceValue(native *native.NativeService, flag byte) ([]byte, error) {
 	source := common.NewZeroCopySource(native.Input)
 	from, err := utils.DecodeAddress(source)
@@ -92,14 +69,25 @@ func AddTransferNotifications(native *native.NativeService, contract common.Addr
 		})
 }
 
-func AddOngxSwapNotifications(native *native.NativeService, contract common.Address, state *State) {
+func AddOngxUnlockNotifications(native *native.NativeService, contract common.Address, state *State) {
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
 	native.Notifications = append(native.Notifications,
 		&event.NotifyEventInfo{
 			ContractAddress: contract,
-			States:          []interface{}{ONGX_SWAP, state.From.ToBase58(), state.Value},
+			States:          []interface{}{ONGX_UNLOCK, state.To.ToBase58(), state.Value},
+		})
+}
+
+func AddOngxLockNotifications(native *native.NativeService, contract common.Address, state *State) {
+	if !config.DefConfig.Common.EnableEventLog {
+		return
+	}
+	native.Notifications = append(native.Notifications,
+		&event.NotifyEventInfo{
+			ContractAddress: contract,
+			States:          []interface{}{ONGX_LOCK, state.From.ToBase58(), state.Value},
 		})
 }
 
@@ -204,25 +192,4 @@ func toTransfer(native *native.NativeService, toKey []byte, value uint64) (uint6
 	}
 	native.CacheDB.Put(toKey, GetToUInt64StorageItem(toBalance, value).ToArray())
 	return toBalance, nil
-}
-
-func GetSyncAddress(native *native.NativeService) (*SyncAddress, error) {
-	context := native.ContextRef.CurrentContext().ContractAddress
-	key := append(context[:], SYNC_ADDRESS...)
-	result, err := native.CacheDB.Get(key)
-	if err != nil {
-		return nil, fmt.Errorf("[GetSyncAddress] get address from cache error:%s", err)
-	}
-	if result == nil {
-		return nil, fmt.Errorf("[GetSyncAddress] sync address is nil")
-	}
-	syncAddrBytes, err := cstates.GetValueFromRawStorageItem(result)
-	if err != nil {
-		return nil, fmt.Errorf("[GetSyncAddress], deserialize from raw storage item err:%v", err)
-	}
-	syncAddr := new(SyncAddress)
-	if err := syncAddr.Deserialization(common.NewZeroCopySource(syncAddrBytes)); err != nil {
-		return nil, fmt.Errorf("[GetSyncAddress], deserialize syncAddr error: %v", err)
-	}
-	return syncAddr, nil
 }

@@ -336,27 +336,6 @@ func putGlobalParam2(native *native.NativeService, contract common.Address, glob
 	return nil
 }
 
-func getSyncAddress(native *native.NativeService) (common.Address, error) {
-	key := append(utils.OngContractAddress[:], ongx.SYNC_ADDRESS...)
-	syncAddressBytes, err := native.CacheDB.Get(key)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("getSyncAddress, get address from cache error:%s", err)
-	}
-	if syncAddressBytes == nil {
-		return common.Address{}, fmt.Errorf("getSyncAddress, get nil syncAddressBytes")
-	}
-	syncAddressStore, err := cstates.GetValueFromRawStorageItem(syncAddressBytes)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("getSyncAddress, deserialize from raw storage item err:%v", err)
-	}
-
-	syncAddress := new(ongx.SyncAddress)
-	if err := syncAddress.Deserialization(common.NewZeroCopySource(syncAddressStore)); err != nil {
-		return common.Address{}, fmt.Errorf("getSyncAddress, deserialize syncAddress error: %v", err)
-	}
-	return syncAddress.SyncAddress, nil
-}
-
 func appCallTransferOng(native *native.NativeService, from common.Address, to common.Address, amount uint64) error {
 	err := appCallTransfer(native, utils.OngContractAddress, from, to, amount)
 	if err != nil {

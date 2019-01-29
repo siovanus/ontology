@@ -24,12 +24,31 @@ import (
 
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/constants"
-	"github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/errors"
 	"github.com/ontio/ontology/smartcontract/service/native"
-	"github.com/ontio/ontology/smartcontract/service/native/global_params"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
+)
+
+const (
+	//method
+	TRANSFER_NAME     = "transfer"
+	APPROVE_NAME      = "approve"
+	TRANSFERFROM_NAME = "transferFrom"
+	NAME_NAME         = "name"
+	SYMBOL_NAME       = "symbol"
+	DECIMALS_NAME     = "decimals"
+	TOTALSUPPLY_NAME  = "totalSupply"
+	BALANCEOF_NAME    = "balanceOf"
+	ALLOWANCE_NAME    = "allowance"
+	ONGX_UNLOCK       = "ongUnlock"
+	ONGX_LOCK         = "ongxLock"
+
+	//prefix
+	TOTAL_SUPPLY_NAME = "totalSupply"
+
+	TRANSFER_FLAG byte = 1
+	APPROVE_FLAG  byte = 2
 )
 
 func InitOngx() {
@@ -46,9 +65,8 @@ func RegisterOngContract(native *native.NativeService) {
 	native.Register(TOTALSUPPLY_NAME, OngxTotalSupply)
 	native.Register(BALANCEOF_NAME, OngxBalanceOf)
 	native.Register(ALLOWANCE_NAME, OngxAllowance)
-	native.Register(ONG_SWAP, OngSwap)
-	native.Register(ONGX_SWAP, OngxSwap)
-	native.Register(SET_SYNC_ADDR_NAME, OngxSetSyncAddr)
+	native.Register(ONGX_UNLOCK, OngxUnlock)
+	native.Register(ONGX_LOCK, OngxLock)
 }
 
 func OngxTransfer(native *native.NativeService) ([]byte, error) {
@@ -142,99 +160,75 @@ func OngxAllowance(native *native.NativeService) ([]byte, error) {
 	return GetBalanceValue(native, APPROVE_FLAG)
 }
 
-func OngxSetSyncAddr(native *native.NativeService) ([]byte, error) {
-	syncAddress := new(SyncAddress)
-	err := syncAddress.Deserialization(common.NewZeroCopySource(native.Input))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("syncAddress.Deserialization, contract params deserialize error: %v", err)
-	}
-
-	context := native.ContextRef.CurrentContext().ContractAddress[:]
-	// get admin from database
-	adminAddress, err := global_params.GetStorageRole(native,
-		global_params.GenerateOperatorKey(utils.ParamContractAddress))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("getAdmin, get admin error: %v", err)
-	}
-
-	//check witness
-	err = utils.ValidateOwner(native, adminAddress)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ongxSetSyncAddr, checkWitness error: %v", err)
-	}
-	native.CacheDB.Put(append(context, SYNC_ADDRESS...), states.GenRawStorageItem(native.Input))
-	return utils.BYTE_TRUE, nil
-}
-
-func OngSwap(native *native.NativeService) ([]byte, error) {
+func OngxUnlock(native *native.NativeService) ([]byte, error) {
 	context := native.ContextRef.CurrentContext().ContractAddress
-	syncAddress, err := GetSyncAddress(native)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] GetSyncAddress error:%s", err)
-	}
-	if !native.ContextRef.CheckWitness(syncAddress.SyncAddress) {
-		return utils.BYTE_FALSE, errors.NewErr("[OngSwap] authentication failed!")
-	}
 	source := common.NewZeroCopySource(native.Input)
-	var ongSwapParam OngSwapParam
-	if err := ongSwapParam.Deserialization(source); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] error:%s", err)
+	var param OngUnlockParam
+	if err := param.Deserialization(source); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngUnlock] error:%s", err)
 	}
 	totalSupplyKey := GenTotalSupplyKey(context)
 	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
 	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngUnlock] error:%s", err)
+	}
+
+	//TODO: auth check
+	key := append(context[:], param.Addr[:]...)
+	balance, err := utils.GetStorageUInt64(native, key)
+	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] error:%s", err)
 	}
+	native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance+param.Value).ToArray())
 	var ok bool
-	for _, v := range ongSwapParam.Swap {
-		key := append(context[:], v.Addr[:]...)
-		balance, err := utils.GetStorageUInt64(native, key)
-		if err != nil {
-			return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] error:%s", err)
-		}
-		native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance+v.Value).ToArray())
-		amount, ok = common.SafeAdd(amount, v.Value)
-		if ok {
-			return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] total supply is more than MAX_UINT64")
-		}
-		if amount > constants.ONGX_TOTAL_SUPPLY {
-			return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] total supply is more than constants.ONGX_TOTAL_SUPPLY")
-		}
-		AddTransferNotifications(native, context, &State{To: v.Addr, Value: v.Value})
+	amount, ok = common.SafeAdd(amount, param.Value)
+	if ok {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] total supply is more than MAX_UINT64")
 	}
+	if amount > constants.ONGX_TOTAL_SUPPLY {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] total supply is more than constants.ONGX_TOTAL_SUPPLY")
+	}
+	AddOngxUnlockNotifications(native, context, &State{To: param.Addr, Value: param.Value})
+
 	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount).ToArray())
 	return utils.BYTE_TRUE, nil
 }
 
-func OngxSwap(native *native.NativeService) ([]byte, error) {
+func OngxLock(native *native.NativeService) ([]byte, error) {
 	context := native.ContextRef.CurrentContext().ContractAddress
 	source := common.NewZeroCopySource(native.Input)
-	var swap Swap
-	if err := swap.Deserialization(source); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+	var param OngxLockParam
+	if err := param.Deserialization(source); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] error:%s", err)
 	}
-	if !native.ContextRef.CheckWitness(swap.Addr) {
-		return utils.BYTE_FALSE, errors.NewErr("[OngxSwap] authentication failed!")
+	if !native.ContextRef.CheckWitness(param.Addr) {
+		return utils.BYTE_FALSE, errors.NewErr("[OngxLock] authentication failed!")
 	}
-	key := append(context[:], swap.Addr[:]...)
+	key := append(context[:], param.Addr[:]...)
 	balance, err := utils.GetStorageUInt64(native, key)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] error:%s", err)
 	}
-	if swap.Value > balance {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] swap ongx balance insufficient! have %d, want %d", balance, swap.Value)
-	} else if swap.Value == balance {
+	if param.Value > balance {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] swap ongx balance insufficient! have %d, want %d", balance, param.Value)
+	} else if param.Value == balance {
 		native.CacheDB.Delete(key)
 	} else {
-		native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance-swap.Value).ToArray())
+		native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance-param.Value).ToArray())
 	}
-	AddOngxSwapNotifications(native, context, &State{From: swap.Addr, Value: swap.Value})
+	AddOngxLockNotifications(native, context, &State{From: param.Addr, Value: param.Value})
 
+	//record ongx lock amount
+	txHash := native.Tx.Hash()
+	key = append(context[:], txHash.ToArray()...)
+	utils.PutBytes(native, key, native.Input)
+
+	//update total supply
 	totalSupplyKey := GenTotalSupplyKey(context)
 	amount, err := utils.GetStorageUInt64(native, totalSupplyKey)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("[OngxSwap] error:%s", err)
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] error:%s", err)
 	}
-	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount-swap.Value).ToArray())
+	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount-param.Value).ToArray())
 	return utils.BYTE_TRUE, nil
 }

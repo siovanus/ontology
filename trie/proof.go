@@ -36,8 +36,8 @@ package trie
 
 import (
 	"bytes"
-	"fmt"
 	"errors"
+	"fmt"
 
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/log"
@@ -113,7 +113,7 @@ func VerifyProof(rootHash common.Uint256, key []byte, proof []rlp.RawValue) ([]b
 		keyRest, cld := get(n, key)
 		switch cld := cld.(type) {
 		case nil:
-			if i != len(proof) - 1 {
+			if i != len(proof)-1 {
 				return nil, fmt.Errorf("[VerifyProof] key mismatch at proof node %d", i)
 			} else {
 				return nil, nil
@@ -122,7 +122,7 @@ func VerifyProof(rootHash common.Uint256, key []byte, proof []rlp.RawValue) ([]b
 			key = keyRest
 			root = cld
 		case valueNode:
-			if i != len(proof) - 1 {
+			if i != len(proof)-1 {
 				return nil, errors.New("[VerifyProof] additional nodes at end of proof")
 			}
 			return cld, nil

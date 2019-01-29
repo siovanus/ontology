@@ -45,6 +45,7 @@ import (
 	"github.com/ontio/ontology/errors"
 	"github.com/ontio/ontology/events"
 	"github.com/ontio/ontology/events/message"
+	"github.com/ontio/ontology/rlp"
 	"github.com/ontio/ontology/smartcontract"
 	scommon "github.com/ontio/ontology/smartcontract/common"
 	"github.com/ontio/ontology/smartcontract/event"
@@ -54,7 +55,6 @@ import (
 	sstate "github.com/ontio/ontology/smartcontract/states"
 	"github.com/ontio/ontology/smartcontract/storage"
 	"github.com/ontio/ontology/trie"
-	"github.com/ontio/ontology/rlp"
 )
 
 const (
@@ -886,7 +886,7 @@ func (this *LedgerStoreImp) AddHeadersToStore(headers []*types.Header) error {
 	return nil
 }
 
-func (this *LedgerStoreImp) GetMPTProof(key []byte) ([]rlp.RawValue , error) {
+func (this *LedgerStoreImp) GetMPTProof(key []byte) ([]rlp.RawValue, error) {
 	root, err := this.stateStore.GetStatesRoot()
 	if err != nil {
 		return nil, err
