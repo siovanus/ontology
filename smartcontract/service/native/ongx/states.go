@@ -214,14 +214,14 @@ func (this *TransferFrom) Deserialization(source *common.ZeroCopySource) error {
 	return err
 }
 
-type OngUnlockParam struct {
+type OngxUnlockParam struct {
 	Addr   common.Address
 	TxHash common.Uint256
 	Value  uint64
 	Proof  [][]byte
 }
 
-func (this *OngUnlockParam) Serialization(sink *common.ZeroCopySink) {
+func (this *OngxUnlockParam) Serialization(sink *common.ZeroCopySink) {
 	utils.EncodeAddress(sink, this.Addr)
 	utils.EncodeUint256(sink, this.TxHash)
 	utils.EncodeVarUint(sink, this.Value)
@@ -231,7 +231,7 @@ func (this *OngUnlockParam) Serialization(sink *common.ZeroCopySink) {
 	}
 }
 
-func (this *OngUnlockParam) Deserialization(source *common.ZeroCopySource) error {
+func (this *OngxUnlockParam) Deserialization(source *common.ZeroCopySource) error {
 	addr, err := utils.DecodeAddress(source)
 	if err != nil {
 		return fmt.Errorf("OngUnlockParam deserialize addr error:%s", err)

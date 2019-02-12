@@ -163,7 +163,7 @@ func OngxAllowance(native *native.NativeService) ([]byte, error) {
 func OngxUnlock(native *native.NativeService) ([]byte, error) {
 	context := native.ContextRef.CurrentContext().ContractAddress
 	source := common.NewZeroCopySource(native.Input)
-	var param OngUnlockParam
+	var param OngxUnlockParam
 	if err := param.Deserialization(source); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("[OngUnlock] error:%s", err)
 	}
