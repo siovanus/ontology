@@ -22,7 +22,6 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"fmt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -76,7 +75,7 @@ func createRandomTrie(n int) (*Trie, map[string]*kv) {
 		key := randBytes(32)
 		value := randBytes(20)
 		trie.TryUpdate(key, value)
-		vals[string(key)] = &kv{key, []byte("123"), false}
+		vals[string(key)] = &kv{key, value, false}
 	}
 	return trie, vals
 }
