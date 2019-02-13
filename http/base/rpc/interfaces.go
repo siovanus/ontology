@@ -539,7 +539,7 @@ func GetMPTProof(params []interface{}) map[string]interface{} {
 	if err != nil {
 		return responsePack(berr.INTERNAL_ERROR, err)
 	}
-	return responseSuccess(prove)
+	return responseSuccess(bcomn.MPTProof{prove})
 }
 
 //get block transactions by height

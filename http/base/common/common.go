@@ -23,6 +23,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
@@ -32,11 +35,10 @@ import (
 	cutils "github.com/ontio/ontology/core/utils"
 	ontErrors "github.com/ontio/ontology/errors"
 	bactor "github.com/ontio/ontology/http/base/actor"
+	"github.com/ontio/ontology/rlp"
 	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm"
-	"strings"
-	"time"
 )
 
 const MAX_SEARCH_HEIGHT uint32 = 100
@@ -52,6 +54,10 @@ type MerkleProof struct {
 	CurBlockRoot     string
 	CurBlockHeight   uint32
 	TargetHashes     []string
+}
+
+type MPTProof struct {
+	MPTProof []rlp.RawValue
 }
 
 type LogEventArgs struct {
