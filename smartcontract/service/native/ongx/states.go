@@ -288,20 +288,3 @@ func (this *OngxLockParam) Deserialization(source *common.ZeroCopySource) error 
 	}
 	return nil
 }
-
-type SyncAddress struct {
-	SyncAddress common.Address
-}
-
-func (this *SyncAddress) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeAddress(sink, this.SyncAddress)
-}
-
-func (this *SyncAddress) Deserialization(source *common.ZeroCopySource) error {
-	var err error
-	this.SyncAddress, err = utils.DecodeAddress(source)
-	if err != nil {
-		return fmt.Errorf("deserialize address error:%s", err)
-	}
-	return nil
-}

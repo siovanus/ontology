@@ -41,7 +41,7 @@ const (
 	TOTALSUPPLY_NAME  = "totalSupply"
 	BALANCEOF_NAME    = "balanceOf"
 	ALLOWANCE_NAME    = "allowance"
-	ONGX_UNLOCK       = "ongUnlock"
+	ONGX_UNLOCK       = "ongxUnlock"
 	ONGX_LOCK         = "ongxLock"
 
 	//prefix
