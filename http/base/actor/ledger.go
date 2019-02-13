@@ -105,6 +105,6 @@ func GetMerkleProof(proofHeight uint32, rootHeight uint32) ([]common.Uint256, er
 	return ledger.DefLedger.GetMerkleProof(proofHeight, rootHeight)
 }
 
-func GetMPTPrrof(key []byte) ([]rlp.RawValue, error) {
-	return ledger.DefLedger.GetMPTProof(key)
+func GetMPTProof(blockHash common.Uint256, key []byte) ([]rlp.RawValue, error) {
+	return ledger.DefLedger.GetMPTProof(blockHash, key)
 }

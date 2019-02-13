@@ -886,11 +886,12 @@ func (this *LedgerStoreImp) AddHeadersToStore(headers []*types.Header) error {
 	return nil
 }
 
-func (this *LedgerStoreImp) GetMPTProof(key []byte) ([]rlp.RawValue, error) {
-	root, err := this.stateStore.GetStatesRoot()
+func (this *LedgerStoreImp) GetMPTProof(blockHash common.Uint256, key []byte) ([]rlp.RawValue, error) {
+	header, err := this.blockStore.GetHeader(blockHash)
 	if err != nil {
 		return nil, err
 	}
+	root := header.StatesRoot
 	overlay := this.stateStore.NewOverlayDB()
 	t, err := trie.New(root, overlay)
 	if err != nil {

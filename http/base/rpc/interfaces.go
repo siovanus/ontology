@@ -527,7 +527,15 @@ func GetMPTProof(params []interface{}) map[string]interface{} {
 	if err != nil {
 		return responsePack(berr.INVALID_PARAMS, err)
 	}
-	prove, err := bactor.GetMPTPrrof(key)
+	blockHashStr, ok := params[1].(string)
+	if !ok {
+		return responsePack(berr.INVALID_PARAMS, "")
+	}
+	blockHash, err := common.Uint256FromHexString(blockHashStr)
+	if err != nil {
+		return responsePack(berr.INVALID_PARAMS, err)
+	}
+	prove, err := bactor.GetMPTProof(blockHash, key)
 	if err != nil {
 		return responsePack(berr.INTERNAL_ERROR, err)
 	}

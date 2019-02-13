@@ -173,8 +173,8 @@ func (self *Ledger) GetMerkleProof(proofHeight, rootHeight uint32) ([]common.Uin
 	return self.ldgStore.GetMerkleProof(proofHeight, rootHeight)
 }
 
-func (self *Ledger) GetMPTProof(key []byte) ([]rlp.RawValue, error) {
-	return self.ldgStore.GetMPTProof(key)
+func (self *Ledger) GetMPTProof(blockHash common.Uint256, key []byte) ([]rlp.RawValue, error) {
+	return self.ldgStore.GetMPTProof(blockHash, key)
 }
 
 func (self *Ledger) PreExecuteContract(tx *types.Transaction) (*cstate.PreExecResult, error) {
