@@ -46,6 +46,7 @@ const (
 
 	//prefix
 	TOTAL_SUPPLY_NAME = "totalSupply"
+	REQUEST_ID        = "requestID"
 
 	TRANSFER_FLAG byte = 1
 	APPROVE_FLAG  byte = 2
@@ -216,12 +217,21 @@ func OngxLock(native *native.NativeService) ([]byte, error) {
 	} else {
 		native.CacheDB.Put(key, utils.GenUInt64StorageItem(balance-param.Value).ToArray())
 	}
-	AddOngxLockNotifications(native, context, &State{From: param.Addr, Value: param.Value})
 
 	//record ongx lock amount
-	txHash := native.Tx.Hash()
-	key = append(context[:], txHash.ToArray()...)
-	utils.PutBytes(native, key, native.Input)
+	requestID, err := getRequestID(native, context)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] getRequestID error:%s", err)
+	}
+	newID := requestID + 1
+	err = putRequest(native, context, newID, native.Input)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] putRequest error:%s", err)
+	}
+	err = putRequestID(native, context, newID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] putRequestID error:%s", err)
+	}
 
 	//update total supply
 	totalSupplyKey := GenTotalSupplyKey(context)
@@ -230,5 +240,7 @@ func OngxLock(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("[OngxLock] error:%s", err)
 	}
 	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount-param.Value).ToArray())
+
+	AddOngxLockNotifications(native, context, newID, native.Height, param.Addr, param.Value)
 	return utils.BYTE_TRUE, nil
 }

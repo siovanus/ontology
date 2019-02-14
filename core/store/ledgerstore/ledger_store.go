@@ -886,7 +886,11 @@ func (this *LedgerStoreImp) AddHeadersToStore(headers []*types.Header) error {
 	return nil
 }
 
-func (this *LedgerStoreImp) GetMPTProof(blockHash common.Uint256, key []byte) ([]rlp.RawValue, error) {
+func (this *LedgerStoreImp) GetMPTProof(blockHeight uint32, key []byte) ([]rlp.RawValue, error) {
+	blockHash, err := this.blockStore.GetBlockHash(blockHeight)
+	if err != nil {
+		return nil, err
+	}
 	header, err := this.blockStore.GetHeader(blockHash)
 	if err != nil {
 		return nil, err

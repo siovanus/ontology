@@ -60,7 +60,7 @@ type LedgerStore interface {
 	IsContainTransaction(txHash common.Uint256) (bool, error)
 	GetBlockRootWithNewTxRoot(txRoot common.Uint256) common.Uint256
 	GetMerkleProof(m, n uint32) ([]common.Uint256, error)
-	GetMPTProof(blockHash common.Uint256, key []byte) ([]rlp.RawValue, error)
+	GetMPTProof(blockHeight uint32, key []byte) ([]rlp.RawValue, error)
 	GetContractState(contractHash common.Address) (*payload.DeployCode, error)
 	GetBookkeeperState() (*states.BookkeeperState, error)
 	GetStorageItem(key *states.StorageKey) (*states.StorageItem, error)

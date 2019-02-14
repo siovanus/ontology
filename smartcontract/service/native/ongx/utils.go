@@ -80,14 +80,15 @@ func AddOngxUnlockNotifications(native *native.NativeService, contract common.Ad
 		})
 }
 
-func AddOngxLockNotifications(native *native.NativeService, contract common.Address, state *State) {
+func AddOngxLockNotifications(native *native.NativeService, contract common.Address, ID uint64, height uint32,
+	address common.Address, value uint64) {
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
 	native.Notifications = append(native.Notifications,
 		&event.NotifyEventInfo{
 			ContractAddress: contract,
-			States:          []interface{}{ONGX_LOCK, state.From.ToBase58(), state.Value},
+			States:          []interface{}{ONGX_LOCK, ID, height, address.ToBase58(), value},
 		})
 }
 
@@ -192,4 +193,57 @@ func toTransfer(native *native.NativeService, toKey []byte, value uint64) (uint6
 	}
 	native.CacheDB.Put(toKey, GetToUInt64StorageItem(toBalance, value).ToArray())
 	return toBalance, nil
+}
+
+func GetUint64Bytes(num uint64) ([]byte, error) {
+	bf := new(bytes.Buffer)
+	if err := serialization.WriteUint64(bf, num); err != nil {
+		return nil, fmt.Errorf("serialization.WriteUint64, serialize uint64 error: %v", err)
+	}
+	return bf.Bytes(), nil
+}
+
+func GetBytesUint64(b []byte) (uint64, error) {
+	num, err := serialization.ReadUint64(bytes.NewBuffer(b))
+	if err != nil {
+		return 0, fmt.Errorf("serialization.ReadUint64, deserialize uint64 error: %v", err)
+	}
+	return num, nil
+}
+
+func putRequestID(native *native.NativeService, contract common.Address, requestID uint64) error {
+	requestIDBytes, err := GetUint64Bytes(requestID)
+	if err != nil {
+		return fmt.Errorf("putRequestID, get requestIDBytes error: %v", err)
+	}
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(REQUEST_ID)), cstates.GenRawStorageItem(requestIDBytes))
+	return nil
+}
+
+func getRequestID(native *native.NativeService, contract common.Address) (uint64, error) {
+	var requestID uint64 = 0
+	value, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(REQUEST_ID)))
+	if err != nil {
+		return 0, fmt.Errorf("getRequestID, get requestID value error: %v", err)
+	}
+	if value != nil {
+		requestIDBytes, err := cstates.GetValueFromRawStorageItem(value)
+		if err != nil {
+			return 0, fmt.Errorf("getRequestID, deserialize from raw storage item err:%v", err)
+		}
+		requestID, err = GetBytesUint64(requestIDBytes)
+		if err != nil {
+			return 0, fmt.Errorf("getRequestID, get requestID error: %v", err)
+		}
+	}
+	return requestID, nil
+}
+
+func putRequest(native *native.NativeService, contract common.Address, requestID uint64, request []byte) error {
+	prefix, err := GetUint64Bytes(requestID)
+	if err != nil {
+		return fmt.Errorf("putRequest, GetUint64Bytes error:%s", err)
+	}
+	utils.PutBytes(native, utils.ConcatKey(contract, prefix), request)
+	return nil
 }

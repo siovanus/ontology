@@ -215,15 +215,13 @@ func (this *TransferFrom) Deserialization(source *common.ZeroCopySource) error {
 }
 
 type OngxUnlockParam struct {
-	Addr   common.Address
-	TxHash common.Uint256
-	Value  uint64
-	Proof  [][]byte
+	Addr  common.Address
+	Value uint64
+	Proof [][]byte
 }
 
 func (this *OngxUnlockParam) Serialization(sink *common.ZeroCopySink) {
 	utils.EncodeAddress(sink, this.Addr)
-	utils.EncodeUint256(sink, this.TxHash)
 	utils.EncodeVarUint(sink, this.Value)
 	utils.EncodeVarUint(sink, uint64(len(this.Proof)))
 	for _, v := range this.Proof {
@@ -235,10 +233,6 @@ func (this *OngxUnlockParam) Deserialization(source *common.ZeroCopySource) erro
 	addr, err := utils.DecodeAddress(source)
 	if err != nil {
 		return fmt.Errorf("OngUnlockParam deserialize addr error:%s", err)
-	}
-	txHash, err := utils.DecodeUint256(source)
-	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize txHash error:%s", err)
 	}
 	value, err := utils.DecodeVarUint(source)
 	if err != nil {
@@ -260,7 +254,6 @@ func (this *OngxUnlockParam) Deserialization(source *common.ZeroCopySource) erro
 		proof = append(proof, v)
 	}
 	this.Addr = addr
-	this.TxHash = txHash
 	this.Value = value
 	this.Proof = proof
 	return nil
