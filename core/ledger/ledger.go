@@ -48,6 +48,16 @@ func NewLedger(dataDir string) (*Ledger, error) {
 	}, nil
 }
 
+func NewLedger2(dataDir string) (*Ledger, error) {
+	ldgStore, err := ledgerstore.NewLedgerStore2(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("NewLedgerStore error %s", err)
+	}
+	return &Ledger{
+		ldgStore: ldgStore,
+	}, nil
+}
+
 func (self *Ledger) GetStore() store.LedgerStore {
 	return self.ldgStore
 }

@@ -63,6 +63,30 @@ func NewBlockStore(dbDir string, enableCache bool) (*BlockStore, error) {
 	return blockStore, nil
 }
 
+//NewBlockStore return the block store instance
+func NewBlockStore2(dbDir string, enableCache bool) (*BlockStore, error) {
+	var cache *BlockCache
+	var err error
+	if enableCache {
+		cache, err = NewBlockCache()
+		if err != nil {
+			return nil, fmt.Errorf("NewBlockCache error %s", err)
+		}
+	}
+
+	store, err := leveldbstore.NewMemLevelDBStore(dbDir)
+	if err != nil {
+		return nil, err
+	}
+	blockStore := &BlockStore{
+		dbDir:       dbDir,
+		enableCache: enableCache,
+		store:       store,
+		cache:       cache,
+	}
+	return blockStore, nil
+}
+
 //NewBatch start a commit batch
 func (this *BlockStore) NewBatch() {
 	this.store.NewBatch()

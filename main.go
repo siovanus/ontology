@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"crypto/md5"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology-eventbus/actor"
 	alog "github.com/ontio/ontology-eventbus/log"
@@ -41,7 +42,7 @@ import (
 	"github.com/ontio/ontology/consensus"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/ledger"
-	"github.com/ontio/ontology/events"
+	scom "github.com/ontio/ontology/core/store/common"
 	bactor "github.com/ontio/ontology/http/base/actor"
 	hserver "github.com/ontio/ontology/http/base/actor"
 	"github.com/ontio/ontology/http/jsonrpc"
@@ -58,6 +59,7 @@ import (
 	"github.com/ontio/ontology/validator/stateful"
 	"github.com/ontio/ontology/validator/stateless"
 	"github.com/urfave/cli"
+	"github.com/ontio/ontology/core/types"
 )
 
 func setupAPP() *cli.App {
@@ -139,55 +141,71 @@ func main() {
 }
 
 func startOntology(ctx *cli.Context) {
-	initLog(ctx)
-
-	_, err := initConfig(ctx)
+	t := time.Now()
+	bookKeepers, err := config.DefConfig.GetBookkeepers()
 	if err != nil {
-		log.Errorf("initConfig error:%s", err)
+		log.Errorf("GetBookkeepers error:%s", err)
 		return
 	}
-	acc, err := initAccount(ctx)
+	genesisConfig := config.DefConfig.Genesis
+	genesisBlock, err := genesis.BuildGenesisBlock(bookKeepers, genesisConfig)
 	if err != nil {
-		log.Errorf("initWallet error:%s", err)
+		log.Errorf("genesisBlock error %s", err)
 		return
 	}
-	ldg, err := initLedger(ctx)
+	ldg1, err := initLedger(ctx, bookKeepers, genesisBlock)
 	if err != nil {
-		log.Errorf("%s", err)
+		log.Errorf("initLedger1 error:%s", err)
 		return
 	}
-	defer ldg.Close()
-	txpool, err := initTxPool(ctx)
+	defer ldg1.Close()
+	store1 := ldg1.GetStore().GetStateStore()
+	iter1 := store1.NewIterator([]byte{byte(scom.ST_STORAGE)})
+	defer iter1.Release()
+	m1 := md5.New()
+	for iter1.Next() {
+		m1.Write(iter1.Key())
+		m1.Write(iter1.Value())
+	}
+	dig1 := hex.EncodeToString(m1.Sum(nil))
+	ldg2, err := initLedger2(ctx, bookKeepers, genesisBlock)
 	if err != nil {
-		log.Errorf("initTxPool error:%s", err)
+		log.Errorf("initLedger2 error:%s", err)
 		return
 	}
-	p2pSvr, p2pPid, err := initP2PNode(ctx, txpool)
-	if err != nil {
-		log.Errorf("initP2PNode error:%s", err)
-		return
+	defer ldg2.Close()
+	currentHeight := ldg1.GetCurrentBlockHeight()
+	t = time.Now()
+	for i := 0; uint32(i) <= currentHeight; i++ {
+		if i % 1000 == 0 {
+			log.Infof("current height:%d", i)
+			elapsed := time.Since(t)
+			fmt.Println("add 1000 block elapsed:", elapsed)
+		}
+		block, err := ldg1.GetBlockByHeight(uint32(i))
+		if err != nil {
+			log.Errorf("ldg.GetBlockByHeight %d error:%s", i, err)
+			return
+		}
+		err = ldg2.AddBlock(block)
+		if err != nil {
+			log.Errorf("ldg2.AddBlock height %d error:%s", i, err)
+			return
+		}
 	}
-	_, err = initConsensus(ctx, p2pPid, txpool, acc)
-	if err != nil {
-		log.Errorf("initConsensus error:%s", err)
-		return
+	store2 := ldg2.GetStore().GetStateStore()
+	iter2 := store2.NewIterator([]byte{byte(scom.ST_STORAGE)})
+	defer iter2.Release()
+	m2 := md5.New()
+	for iter2.Next() {
+		m2.Write(iter2.Key())
+		m2.Write(iter2.Value())
 	}
-	err = initRpc(ctx)
-	if err != nil {
-		log.Errorf("initRpc error:%s", err)
-		return
-	}
-	err = initLocalRpc(ctx)
-	if err != nil {
-		log.Errorf("initLocalRpc error:%s", err)
-		return
-	}
-	initRestful(ctx)
-	initWs(ctx)
-	initNodeInfo(ctx, p2pSvr)
-
-	go logCurrBlockHeight()
-	waitToExit()
+	dig2 := hex.EncodeToString(m2.Sum(nil))
+	log.Infof("md5 1 is:%s", dig1)
+	log.Infof("md5 2 is:%s", dig2)
+	elapsed := time.Since(t)
+	fmt.Println("app elapsed:", elapsed)
 }
 
 func initLog(ctx *cli.Context) {
@@ -234,23 +252,28 @@ func initAccount(ctx *cli.Context) (*account.Account, error) {
 	return acc, nil
 }
 
-func initLedger(ctx *cli.Context) (*ledger.Ledger, error) {
-	events.Init() //Init event hub
-
+func initLedger(ctx *cli.Context, bookKeepers []keypair.PublicKey, genesisBlock *types.Block) (*ledger.Ledger, error) {
 	var err error
 	dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
 	ledger.DefLedger, err = ledger.NewLedger(dbDir)
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
-	bookKeepers, err := config.DefConfig.GetBookkeepers()
+	err = ledger.DefLedger.Init(bookKeepers, genesisBlock)
 	if err != nil {
-		return nil, fmt.Errorf("GetBookkeepers error:%s", err)
+		return nil, fmt.Errorf("Init ledger error:%s", err)
 	}
-	genesisConfig := config.DefConfig.Genesis
-	genesisBlock, err := genesis.BuildGenesisBlock(bookKeepers, genesisConfig)
+
+	log.Infof("Ledger init success")
+	return ledger.DefLedger, nil
+}
+
+func initLedger2(ctx *cli.Context, bookKeepers []keypair.PublicKey, genesisBlock *types.Block) (*ledger.Ledger, error) {
+	var err error
+	dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
+	ledger.DefLedger, err = ledger.NewLedger2(dbDir)
 	if err != nil {
-		return nil, fmt.Errorf("genesisBlock error %s", err)
+		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
 	err = ledger.DefLedger.Init(bookKeepers, genesisBlock)
 	if err != nil {

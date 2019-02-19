@@ -49,6 +49,18 @@ func NewEventStore(dbDir string) (*EventStore, error) {
 	}, nil
 }
 
+//NewEventStore return event store instance
+func NewEventStore2(dbDir string) (*EventStore, error) {
+	store, err := leveldbstore.NewMemLevelDBStore(dbDir)
+	if err != nil {
+		return nil, err
+	}
+	return &EventStore{
+		dbDir: dbDir,
+		store: store,
+	}, nil
+}
+
 //NewBatch start event commit batch
 func (this *EventStore) NewBatch() {
 	this.store.NewBatch()

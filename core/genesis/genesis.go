@@ -271,5 +271,6 @@ func newGoverConfigInit(config []byte) *types.Transaction {
 	if err != nil {
 		panic("constract genesis governing token transaction error ")
 	}
+
 	return tx
 }

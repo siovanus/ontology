@@ -20,8 +20,6 @@ package ledgerstore
 
 import (
 	"bytes"
-	"fmt"
-
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/serialization"
 	"github.com/ontio/ontology/core/payload"
@@ -30,7 +28,6 @@ import (
 	"github.com/ontio/ontology/core/store/leveldbstore"
 	"github.com/ontio/ontology/core/store/overlaydb"
 	"github.com/ontio/ontology/core/store/statestore"
-	"github.com/ontio/ontology/merkle"
 )
 
 var (
@@ -41,9 +38,6 @@ var (
 type StateStore struct {
 	dbDir           string                    //Store file path
 	store           scom.PersistStore         //Store handler
-	merklePath      string                    //Merkle tree store path
-	merkleTree      *merkle.CompactMerkleTree //Merkle tree of block root
-	merkleHashStore merkle.HashStore
 }
 
 //NewStateStore return state store instance
@@ -56,15 +50,20 @@ func NewStateStore(dbDir, merklePath string) (*StateStore, error) {
 	stateStore := &StateStore{
 		dbDir:      dbDir,
 		store:      store,
-		merklePath: merklePath,
 	}
-	_, height, err := stateStore.GetCurrentBlock()
-	if err != nil && err != scom.ErrNotFound {
-		return nil, fmt.Errorf("GetCurrentBlock error %s", err)
-	}
-	err = stateStore.init(height)
+	return stateStore, nil
+}
+
+//NewStateStore return state store instance
+func NewStateStore2(dbDir, merklePath string) (*StateStore, error) {
+	var err error
+	store, err := leveldbstore.NewMemLevelDBStore(dbDir)
 	if err != nil {
-		return nil, fmt.Errorf("init error %s", err)
+		return nil, err
+	}
+	stateStore := &StateStore{
+		dbDir:      dbDir,
+		store:      store,
 	}
 	return stateStore, nil
 }
@@ -72,22 +71,6 @@ func NewStateStore(dbDir, merklePath string) (*StateStore, error) {
 //NewBatch start new commit batch
 func (self *StateStore) NewBatch() {
 	self.store.NewBatch()
-}
-
-func (self *StateStore) init(currBlockHeight uint32) error {
-	treeSize, hashes, err := self.GetMerkleTree()
-	if err != nil && err != scom.ErrNotFound {
-		return err
-	}
-	if treeSize > 0 && treeSize != currBlockHeight+1 {
-		return fmt.Errorf("merkle tree size is inconsistent with blockheight: %d", currBlockHeight+1)
-	}
-	self.merkleHashStore, err = merkle.NewFileHashStore(self.merklePath, treeSize)
-	if err != nil {
-		return fmt.Errorf("merkle store is inconsistent with ChainStore. persistence will be disabled")
-	}
-	self.merkleTree = merkle.NewTree(treeSize, hashes, self.merkleHashStore)
-	return nil
 }
 
 //GetMerkleTree return merkle tree size an tree node
@@ -113,37 +96,6 @@ func (self *StateStore) GetMerkleTree() (uint32, []common.Uint256, error) {
 		hashes = append(hashes, *hash)
 	}
 	return treeSize, hashes, nil
-}
-
-//AddMerkleTreeRoot add a new tree root
-func (self *StateStore) AddMerkleTreeRoot(txRoot common.Uint256) error {
-	key := self.getMerkleTreeKey()
-
-	self.merkleTree.AppendHash(txRoot)
-	err := self.merkleHashStore.Flush()
-	if err != nil {
-		return err
-	}
-	treeSize := self.merkleTree.TreeSize()
-	hashes := self.merkleTree.Hashes()
-	value := bytes.NewBuffer(make([]byte, 0, 4+len(hashes)*common.UINT256_SIZE))
-	err = serialization.WriteUint32(value, treeSize)
-	if err != nil {
-		return err
-	}
-	for _, hash := range hashes {
-		err = hash.Serialize(value)
-		if err != nil {
-			return err
-		}
-	}
-	self.store.BatchPut(key, value.Bytes())
-	return nil
-}
-
-//GetMerkleProof return merkle proof of block
-func (self *StateStore) GetMerkleProof(proofHeight, rootHeight uint32) ([]common.Uint256, error) {
-	return self.merkleTree.InclusionProof(proofHeight, rootHeight+1)
 }
 
 //NewStateBatch return state commit bathe. Usually using in smart contract execution
@@ -290,10 +242,6 @@ func (self *StateStore) getStorageKey(key *states.StorageKey) ([]byte, error) {
 	buf.Write(key.ContractAddress[:])
 	buf.Write(key.Key)
 	return buf.Bytes(), nil
-}
-
-func (self *StateStore) GetBlockRootWithNewTxRoot(txRoot common.Uint256) common.Uint256 {
-	return self.merkleTree.GetRootWithNewLeaf(txRoot)
 }
 
 func (self *StateStore) getMerkleTreeKey() []byte {

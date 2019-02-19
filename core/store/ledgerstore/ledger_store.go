@@ -114,6 +114,41 @@ func NewLedgerStore(dataDir string) (*LedgerStoreImp, error) {
 	return ledgerStore, nil
 }
 
+//NewLedgerStore return LedgerStoreImp instance
+func NewLedgerStore2(dataDir string) (*LedgerStoreImp, error) {
+	ledgerStore := &LedgerStoreImp{
+		headerIndex:        make(map[uint32]common.Uint256),
+		headerCache:        make(map[common.Uint256]*types.Header, 0),
+		vbftPeerInfoheader: make(map[string]uint32),
+		vbftPeerInfoblock:  make(map[string]uint32),
+	}
+
+	blockStore, err := NewBlockStore2(fmt.Sprintf("%s%s%s", dataDir, string(os.PathSeparator), DBDirBlock), true)
+	if err != nil {
+		return nil, fmt.Errorf("NewBlockStore error %s", err)
+	}
+	ledgerStore.blockStore = blockStore
+
+	stateStore, err := NewStateStore2(fmt.Sprintf("%s%s%s", dataDir, string(os.PathSeparator), DBDirState),
+		fmt.Sprintf("%s%s%s", dataDir, string(os.PathSeparator), MerkleTreeStorePath))
+	if err != nil {
+		return nil, fmt.Errorf("NewStateStore error %s", err)
+	}
+	ledgerStore.stateStore = stateStore
+
+	eventState, err := NewEventStore2(fmt.Sprintf("%s%s%s", dataDir, string(os.PathSeparator), DBDirEvent))
+	if err != nil {
+		return nil, fmt.Errorf("NewEventStore error %s", err)
+	}
+	ledgerStore.eventStore = eventState
+
+	return ledgerStore, nil
+}
+
+func (this *LedgerStoreImp) GetStateStore() scom.PersistStore {
+	return this.stateStore.store
+}
+
 //InitLedgerStoreWithGenesisBlock init the ledger store with genesis block. It's the first operation after NewLedgerStore.
 func (this *LedgerStoreImp) InitLedgerStoreWithGenesisBlock(genesisBlock *types.Block, defaultBookkeeper []keypair.PublicKey) error {
 	hasInit, err := this.hasAlreadyInitGenesisBlock()
@@ -574,12 +609,7 @@ func (this *LedgerStoreImp) saveBlockToStateStore(block *types.Block) error {
 		}
 	}
 
-	err := this.stateStore.AddMerkleTreeRoot(block.Header.TransactionsRoot)
-	if err != nil {
-		return fmt.Errorf("AddMerkleTreeRoot error %s", err)
-	}
-
-	err = this.stateStore.SaveCurrentBlock(blockHeight, blockHash)
+	err := this.stateStore.SaveCurrentBlock(blockHeight, blockHash)
 	if err != nil {
 		return fmt.Errorf("SaveCurrentBlock error %s", err)
 	}
@@ -747,7 +777,7 @@ func (this *LedgerStoreImp) IsContainTransaction(txHash common.Uint256) (bool, e
 
 //GetBlockRootWithNewTxRoot return the block root(merkle root of blocks) after add a new tx root of block
 func (this *LedgerStoreImp) GetBlockRootWithNewTxRoot(txRoot common.Uint256) common.Uint256 {
-	return this.stateStore.GetBlockRootWithNewTxRoot(txRoot)
+	return common.Uint256{}
 }
 
 //GetBlockHash return the block hash by block height
@@ -806,7 +836,7 @@ func (this *LedgerStoreImp) GetBookkeeperState() (*states.BookkeeperState, error
 
 //GetMerkleProof return the block merkle proof. Wrap function of StateStore.GetMerkleProof
 func (this *LedgerStoreImp) GetMerkleProof(proofHeight, rootHeight uint32) ([]common.Uint256, error) {
-	return this.stateStore.GetMerkleProof(proofHeight, rootHeight)
+	return nil, nil
 }
 
 //GetContractState return contract by contract address. Wrap function of StateStore.GetContractState
