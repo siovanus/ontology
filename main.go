@@ -28,6 +28,8 @@ import (
 	"syscall"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
 	"crypto/md5"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology-eventbus/actor"
@@ -60,6 +62,7 @@ import (
 	"github.com/ontio/ontology/validator/stateless"
 	"github.com/urfave/cli"
 	"github.com/ontio/ontology/core/types"
+	"strconv"
 )
 
 func setupAPP() *cli.App {
@@ -134,6 +137,13 @@ func setupAPP() *cli.App {
 }
 
 func main() {
+	go func() {
+		http.HandleFunc("/goroutines", func(w http.ResponseWriter, r *http.Request) {
+			num := strconv.FormatInt(int64(runtime.NumGoroutine()), 10)
+			w.Write([]byte(num))
+		})
+		http.ListenAndServe("0.0.0.0:30336", nil)
+	}()
 	if err := setupAPP().Run(os.Args); err != nil {
 		cmd.PrintErrorMsg(err.Error())
 		os.Exit(1)
@@ -203,6 +213,7 @@ func startOntology(ctx *cli.Context) {
 	log.Infof("md5 2 is:%s", dig2)
 	elapsed := time.Since(t)
 	fmt.Println("app elapsed:", elapsed)
+	waitToExit()
 }
 
 func initLog(ctx *cli.Context) {
