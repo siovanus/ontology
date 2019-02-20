@@ -42,8 +42,6 @@ import (
 	"github.com/ontio/ontology/core/store/overlaydb"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/errors"
-	"github.com/ontio/ontology/events"
-	"github.com/ontio/ontology/events/message"
 	"github.com/ontio/ontology/smartcontract"
 	scommon "github.com/ontio/ontology/smartcontract/common"
 	"github.com/ontio/ontology/smartcontract/event"
@@ -207,6 +205,9 @@ func (this *LedgerStoreImp) InitLedgerStoreWithGenesisBlock(genesisBlock *types.
 		blk, err := this.GetBlockByHeight(this.currBlockHeight)
 		if err != nil {
 			return err
+		}
+		if blk == nil {
+			blk = genesisBlock
 		}
 		blkInfo, err := vconfig.VbftBlock(blk.Header)
 		if err != nil {
@@ -540,22 +541,22 @@ func (this *LedgerStoreImp) AddHeaders(headers []*types.Header) error {
 //AddBlock add the block to store.
 //When the block is not the next block, it will be cache. until the missing block arrived
 func (this *LedgerStoreImp) AddBlock(block *types.Block) error {
-	currBlockHeight := this.GetCurrentBlockHeight()
-	blockHeight := block.Header.Height
-	if blockHeight <= currBlockHeight {
-		return nil
-	}
-	nextBlockHeight := currBlockHeight + 1
-	if blockHeight != nextBlockHeight {
-		return fmt.Errorf("block height %d not equal next block height %d", blockHeight, nextBlockHeight)
-	}
-	var err error
-	this.vbftPeerInfoblock, err = this.verifyHeader(block.Header, this.vbftPeerInfoblock)
-	if err != nil {
-		return fmt.Errorf("verifyHeader error %s", err)
-	}
+	//currBlockHeight := this.GetCurrentBlockHeight()
+	//blockHeight := block.Header.Height
+	//if blockHeight <= currBlockHeight {
+	//	return nil
+	//}
+	//nextBlockHeight := currBlockHeight + 1
+	//if blockHeight != nextBlockHeight {
+	//	return fmt.Errorf("block height %d not equal next block height %d", blockHeight, nextBlockHeight)
+	//}
+	//var err error
+	//this.vbftPeerInfoblock, err = this.verifyHeader(block.Header, this.vbftPeerInfoblock)
+	//if err != nil {
+	//	return fmt.Errorf("verifyHeader error %s", err)
+	//}
 
-	err = this.saveBlock(block)
+	err := this.saveBlock(block)
 	if err != nil {
 		return fmt.Errorf("saveBlock error %s", err)
 	}
@@ -672,43 +673,43 @@ func (this *LedgerStoreImp) saveBlock(block *types.Block) error {
 		return nil
 	}
 
-	this.blockStore.NewBatch()
+	//this.blockStore.NewBatch()
 	this.stateStore.NewBatch()
-	this.eventStore.NewBatch()
-	err := this.saveBlockToBlockStore(block)
-	if err != nil {
-		return fmt.Errorf("save to block store height:%d error:%s", blockHeight, err)
-	}
-	err = this.saveBlockToStateStore(block)
+	//this.eventStore.NewBatch()
+	//err := this.saveBlockToBlockStore(block)
+	//if err != nil {
+	//	return fmt.Errorf("save to block store height:%d error:%s", blockHeight, err)
+	//}
+	err := this.saveBlockToStateStore(block)
 	if err != nil {
 		return fmt.Errorf("save to state store height:%d error:%s", blockHeight, err)
 	}
-	err = this.saveBlockToEventStore(block)
-	if err != nil {
-		return fmt.Errorf("save to event store height:%d error:%s", blockHeight, err)
-	}
-	err = this.blockStore.CommitTo()
-	if err != nil {
-		return fmt.Errorf("blockStore.CommitTo height:%d error %s", blockHeight, err)
-	}
+	//err = this.saveBlockToEventStore(block)
+	//if err != nil {
+	//	return fmt.Errorf("save to event store height:%d error:%s", blockHeight, err)
+	//}
+	//err = this.blockStore.CommitTo()
+	//if err != nil {
+	//	return fmt.Errorf("blockStore.CommitTo height:%d error %s", blockHeight, err)
+	//}
 	// event store is idempotent to re-save when in recovering process, so save first before stateStore
-	err = this.eventStore.CommitTo()
-	if err != nil {
-		return fmt.Errorf("eventStore.CommitTo height:%d error %s", blockHeight, err)
-	}
+	//err = this.eventStore.CommitTo()
+	//if err != nil {
+	//	return fmt.Errorf("eventStore.CommitTo height:%d error %s", blockHeight, err)
+	//}
 	err = this.stateStore.CommitTo()
 	if err != nil {
 		return fmt.Errorf("stateStore.CommitTo height:%d error %s", blockHeight, err)
 	}
 	this.setCurrentBlock(blockHeight, blockHash)
 
-	if events.DefActorPublisher != nil {
-		events.DefActorPublisher.Publish(
-			message.TOPIC_SAVE_BLOCK_COMPLETE,
-			&message.SaveBlockCompleteMsg{
-				Block: block,
-			})
-	}
+	//if events.DefActorPublisher != nil {
+	//	events.DefActorPublisher.Publish(
+	//		message.TOPIC_SAVE_BLOCK_COMPLETE,
+	//		&message.SaveBlockCompleteMsg{
+	//			Block: block,
+	//		})
+	//}
 	return nil
 }
 
@@ -724,7 +725,7 @@ func (this *LedgerStoreImp) handleTransaction(overlay *overlaydb.OverlayDB, bloc
 		if err != nil {
 			log.Debugf("HandleDeployTransaction tx %s error %s", txHash.ToHexString(), err)
 		}
-		SaveNotify(this.eventStore, txHash, notify)
+		//SaveNotify(this.eventStore, txHash, notify)
 	case types.Invoke:
 		err := this.stateStore.HandleInvokeTransaction(this, overlay, tx, block, notify)
 		if overlay.Error() != nil {
@@ -733,7 +734,7 @@ func (this *LedgerStoreImp) handleTransaction(overlay *overlaydb.OverlayDB, bloc
 		if err != nil {
 			log.Debugf("HandleInvokeTransaction tx %s error %s", txHash.ToHexString(), err)
 		}
-		SaveNotify(this.eventStore, txHash, notify)
+		//SaveNotify(this.eventStore, txHash, notify)
 	}
 	return nil
 }

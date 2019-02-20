@@ -175,16 +175,13 @@ func startOntology(ctx *cli.Context) {
 	}
 	defer ldg2.Close()
 	currentHeight := ldg1.GetCurrentBlockHeight()
-	t = time.Now()
 	for i := 0; uint32(i) <= currentHeight; i++ {
-		if i % 1000 == 0 {
+		if i % 10000 == 0 {
 			log.Infof("current height:%d", i)
-			elapsed := time.Since(t)
-			fmt.Println("add 1000 block elapsed:", elapsed)
 		}
 		block, err := ldg1.GetBlockByHeight(uint32(i))
 		if err != nil {
-			log.Errorf("ldg.GetBlockByHeight %d error:%s", i, err)
+			log.Errorf("ldg1.GetBlockByHeight %d error:%s", i, err)
 			return
 		}
 		err = ldg2.AddBlock(block)
