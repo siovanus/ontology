@@ -23,11 +23,9 @@ import (
 	"fmt"
 
 	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/serialization"
 	cstates "github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/errors"
-	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
@@ -48,14 +46,14 @@ const (
 )
 
 func AddNotifications(native *native.NativeService, contract common.Address, state *State) {
-	if !config.DefConfig.Common.EnableEventLog {
-		return
-	}
-	native.Notifications = append(native.Notifications,
-		&event.NotifyEventInfo{
-			ContractAddress: contract,
-			States:          []interface{}{TRANSFER_NAME, state.From.ToBase58(), state.To.ToBase58(), state.Value},
-		})
+	//if !config.DefConfig.Common.EnableEventLog {
+	//	return
+	//}
+	//native.Notifications = append(native.Notifications,
+	//	&event.NotifyEventInfo{
+	//		ContractAddress: contract,
+	//		States:          []interface{}{TRANSFER_NAME, state.From.ToBase58(), state.To.ToBase58(), state.Value},
+	//	})
 }
 
 func GetToUInt64StorageItem(toBalance, value uint64) *cstates.StorageItem {
