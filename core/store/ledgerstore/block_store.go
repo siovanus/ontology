@@ -98,18 +98,18 @@ func (this *BlockStore) SaveBlock(block *types.Block) error {
 		this.cache.AddBlock(block)
 	}
 
-	blockHeight := block.Header.Height
+	//blockHeight := block.Header.Height
 	err := this.SaveHeader(block, 0)
 	if err != nil {
 		return fmt.Errorf("SaveHeader error %s", err)
 	}
-	for _, tx := range block.Transactions {
-		err = this.SaveTransaction(tx, blockHeight)
-		if err != nil {
-			txHash := tx.Hash()
-			return fmt.Errorf("SaveTransaction block height %d tx %s err %s", blockHeight, txHash.ToHexString(), err)
-		}
-	}
+	//for _, tx := range block.Transactions {
+	//	err = this.SaveTransaction(tx, blockHeight)
+	//	if err != nil {
+	//		txHash := tx.Hash()
+	//		return fmt.Errorf("SaveTransaction block height %d tx %s err %s", blockHeight, txHash.ToHexString(), err)
+	//	}
+	//}
 	return nil
 }
 

@@ -569,11 +569,11 @@ func (this *LedgerStoreImp) saveBlockToBlockStore(block *types.Block) error {
 	blockHeight := block.Header.Height
 
 	this.setHeaderIndex(blockHeight, blockHash)
-	err := this.saveHeaderIndexList()
-	if err != nil {
-		return fmt.Errorf("saveHeaderIndexList error %s", err)
-	}
-	err = this.blockStore.SaveCurrentBlock(blockHeight, blockHash)
+	//err := this.saveHeaderIndexList()
+	//if err != nil {
+	//	return fmt.Errorf("saveHeaderIndexList error %s", err)
+	//}
+	err := this.blockStore.SaveCurrentBlock(blockHeight, blockHash)
 	if err != nil {
 		return fmt.Errorf("SaveCurrentBlock error %s", err)
 	}
@@ -673,14 +673,14 @@ func (this *LedgerStoreImp) saveBlock(block *types.Block) error {
 		return nil
 	}
 
-	//this.blockStore.NewBatch()
+	this.blockStore.NewBatch()
 	this.stateStore.NewBatch()
 	//this.eventStore.NewBatch()
-	//err := this.saveBlockToBlockStore(block)
-	//if err != nil {
-	//	return fmt.Errorf("save to block store height:%d error:%s", blockHeight, err)
-	//}
-	err := this.saveBlockToStateStore(block)
+	err := this.saveBlockToBlockStore(block)
+	if err != nil {
+		return fmt.Errorf("save to block store height:%d error:%s", blockHeight, err)
+	}
+	err = this.saveBlockToStateStore(block)
 	if err != nil {
 		return fmt.Errorf("save to state store height:%d error:%s", blockHeight, err)
 	}
@@ -688,10 +688,10 @@ func (this *LedgerStoreImp) saveBlock(block *types.Block) error {
 	//if err != nil {
 	//	return fmt.Errorf("save to event store height:%d error:%s", blockHeight, err)
 	//}
-	//err = this.blockStore.CommitTo()
-	//if err != nil {
-	//	return fmt.Errorf("blockStore.CommitTo height:%d error %s", blockHeight, err)
-	//}
+	err = this.blockStore.CommitTo()
+	if err != nil {
+		return fmt.Errorf("blockStore.CommitTo height:%d error %s", blockHeight, err)
+	}
 	// event store is idempotent to re-save when in recovering process, so save first before stateStore
 	//err = this.eventStore.CommitTo()
 	//if err != nil {

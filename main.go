@@ -63,6 +63,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/ontio/ontology/core/types"
 	"strconv"
+	"bufio"
 )
 
 func setupAPP() *cli.App {
@@ -173,10 +174,22 @@ func startOntology(ctx *cli.Context) {
 	iter1 := store1.NewIterator([]byte{byte(scom.ST_STORAGE)})
 	defer iter1.Release()
 	m1 := md5.New()
+	f, err := os.Create("result1.txt")
+	if err != nil {
+		fmt.Println("os.Create error:", err)
+		return
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
 	for iter1.Next() {
 		m1.Write(iter1.Key())
 		m1.Write(iter1.Value())
+		w.WriteString(hex.EncodeToString(iter1.Key()))
+		w.WriteString("\n")
+		w.WriteString(hex.EncodeToString(iter1.Value()))
+		w.WriteString("\n")
 	}
+	w.Flush()
 	dig1 := hex.EncodeToString(m1.Sum(nil))
 	ldg2, err := initLedger2(ctx, bookKeepers, genesisBlock)
 	if err != nil {
@@ -204,10 +217,22 @@ func startOntology(ctx *cli.Context) {
 	iter2 := store2.NewIterator([]byte{byte(scom.ST_STORAGE)})
 	defer iter2.Release()
 	m2 := md5.New()
+	f2, err := os.Create("result2.txt")
+	if err != nil {
+		fmt.Println("os.Create error:", err)
+		return
+	}
+	defer f2.Close()
+	w2 := bufio.NewWriter(f2)
 	for iter2.Next() {
 		m2.Write(iter2.Key())
 		m2.Write(iter2.Value())
+		w2.WriteString(hex.EncodeToString(iter2.Key()))
+		w2.WriteString("\n")
+		w2.WriteString(hex.EncodeToString(iter2.Value()))
+		w2.WriteString("\n")
 	}
+	w2.Flush()
 	dig2 := hex.EncodeToString(m2.Sum(nil))
 	log.Infof("md5 1 is:%s", dig1)
 	log.Infof("md5 2 is:%s", dig2)

@@ -67,6 +67,7 @@ func BlockChainGetHeader(service *NeoVmService, engine *vm.ExecutionEngine) erro
 
 // BlockChainGetBlock put blockchain's block to vm stack
 func BlockChainGetBlock(service *NeoVmService, engine *vm.ExecutionEngine) error {
+	panic("BlockChainGetBlock not support")
 	if vm.EvaluationStackCount(engine) < 1 {
 		return errors.NewErr("[BlockChainGetBlock] Too few input parameters ")
 	}
@@ -103,6 +104,7 @@ func BlockChainGetBlock(service *NeoVmService, engine *vm.ExecutionEngine) error
 
 // BlockChainGetTransaction put blockchain's transaction to vm stack
 func BlockChainGetTransaction(service *NeoVmService, engine *vm.ExecutionEngine) error {
+	panic("BlockChainGetTransaction not support")
 	d, err := vm.PopByteArray(engine)
 	if err != nil {
 		return err
@@ -121,6 +123,7 @@ func BlockChainGetTransaction(service *NeoVmService, engine *vm.ExecutionEngine)
 
 // BlockChainGetContract put blockchain's contract to vm stack
 func BlockChainGetContract(service *NeoVmService, engine *vm.ExecutionEngine) error {
+	panic("BlockChainGetContract not support")
 	if vm.EvaluationStackCount(engine) < 1 {
 		return errors.NewErr("[GetContract] Too few input parameters ")
 	}
@@ -142,6 +145,7 @@ func BlockChainGetContract(service *NeoVmService, engine *vm.ExecutionEngine) er
 
 // BlockChainGetTransactionHeight put transaction in block height to vm stack
 func BlockChainGetTransactionHeight(service *NeoVmService, engine *vm.ExecutionEngine) error {
+	panic("BlockChainGetTransactionHeight not support")
 	if vm.EvaluationStackCount(engine) < 1 {
 		return errors.NewErr("[BlockChainGetTransactionHeight] Too few input parameters ")
 	}
