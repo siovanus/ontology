@@ -36,8 +36,8 @@ var (
 
 //StateStore saving the data of ledger states. Like balance of account, and the execution result of smart contract
 type StateStore struct {
-	dbDir           string                    //Store file path
-	store           scom.PersistStore         //Store handler
+	dbDir string            //Store file path
+	store scom.PersistStore //Store handler
 }
 
 //NewStateStore return state store instance
@@ -48,8 +48,8 @@ func NewStateStore(dbDir, merklePath string) (*StateStore, error) {
 		return nil, err
 	}
 	stateStore := &StateStore{
-		dbDir:      dbDir,
-		store:      store,
+		dbDir: dbDir,
+		store: store,
 	}
 	return stateStore, nil
 }
@@ -62,8 +62,8 @@ func NewStateStore2(dbDir, merklePath string) (*StateStore, error) {
 		return nil, err
 	}
 	stateStore := &StateStore{
-		dbDir:      dbDir,
-		store:      store,
+		dbDir: dbDir,
+		store: store,
 	}
 	return stateStore, nil
 }

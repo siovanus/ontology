@@ -28,8 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	"net/http"
-	_ "net/http/pprof"
+	"bufio"
 	"crypto/md5"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology-eventbus/actor"
@@ -41,10 +40,14 @@ import (
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/log"
+	"github.com/ontio/ontology/common/serialization"
 	"github.com/ontio/ontology/consensus"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/ledger"
 	scom "github.com/ontio/ontology/core/store/common"
+	"github.com/ontio/ontology/core/store/ledgerstore"
+	"github.com/ontio/ontology/core/store/leveldbstore"
+	"github.com/ontio/ontology/core/types"
 	bactor "github.com/ontio/ontology/http/base/actor"
 	hserver "github.com/ontio/ontology/http/base/actor"
 	"github.com/ontio/ontology/http/jsonrpc"
@@ -61,7 +64,10 @@ import (
 	"github.com/ontio/ontology/validator/stateful"
 	"github.com/ontio/ontology/validator/stateless"
 	"github.com/urfave/cli"
-	"github.com/ontio/ontology/core/types"
+	"io"
+	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 )
 
@@ -152,6 +158,13 @@ func main() {
 
 func startOntology(ctx *cli.Context) {
 	t := time.Now()
+	//old md5
+	dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
+	store1, err := leveldbstore.NewLevelDBStore(fmt.Sprintf("%s%s%s", dbDir, string(os.PathSeparator), ledgerstore.DBDirState))
+	if err != nil {
+		log.Errorf("leveldbstore.NewLevelDBStore error:%s", err)
+		return
+	}
 	bookKeepers, err := config.DefConfig.GetBookkeepers()
 	if err != nil {
 		log.Errorf("GetBookkeepers error:%s", err)
@@ -163,13 +176,6 @@ func startOntology(ctx *cli.Context) {
 		log.Errorf("genesisBlock error %s", err)
 		return
 	}
-	ldg1, err := initLedger(ctx, bookKeepers, genesisBlock)
-	if err != nil {
-		log.Errorf("initLedger1 error:%s", err)
-		return
-	}
-	defer ldg1.Close()
-	store1 := ldg1.GetStore().GetStateStore()
 	iter1 := store1.NewIterator([]byte{byte(scom.ST_STORAGE)})
 	defer iter1.Release()
 	m1 := md5.New()
@@ -177,6 +183,8 @@ func startOntology(ctx *cli.Context) {
 		m1.Write(iter1.Key())
 		m1.Write(iter1.Value())
 	}
+
+	//new md5
 	dig1 := hex.EncodeToString(m1.Sum(nil))
 	ldg2, err := initLedger2(ctx, bookKeepers, genesisBlock)
 	if err != nil {
@@ -184,20 +192,63 @@ func startOntology(ctx *cli.Context) {
 		return
 	}
 	defer ldg2.Close()
-	currentHeight := ldg1.GetCurrentBlockHeight()
-	for i := 0; uint32(i) <= currentHeight; i++ {
-		if i % 10000 == 0 {
-			log.Infof("current height:%d", i)
-		}
-		block, err := ldg1.GetBlockByHeight(uint32(i))
+	rd, err := ioutil.ReadDir("BlockFiles")
+	for _, fi := range rd {
+		ifile, err := os.OpenFile("BlockFiles/"+fi.Name(), os.O_RDONLY, 0644)
 		if err != nil {
-			log.Errorf("ldg1.GetBlockByHeight %d error:%s", i, err)
+			log.Errorf("OpenFile error:%s", err)
 			return
 		}
-		err = ldg2.AddBlock(block)
+		log.Infof("OpenFile:%s", fi.Name())
+		defer ifile.Close()
+		fReader := bufio.NewReader(ifile)
+		metadata := utils.NewExportBlockMetadata()
+		err = metadata.Deserialize(fReader)
 		if err != nil {
-			log.Errorf("ldg2.AddBlock height %d error:%s", i, err)
+			log.Errorf("block data file metadata deserialize error:%s", err)
 			return
+		}
+		currBlockHeight := ldg2.GetCurrentBlockHeight()
+		startBlockHeight := metadata.StartBlockHeight
+		endBlockHeight := metadata.EndBlockHeight
+		if metadata.EndBlockHeight <= currBlockHeight {
+			log.Errorf("CurrentBlockHeight:%d larger than or equal to EndBlockHeight:%d, No blocks to import.", currBlockHeight, endBlockHeight)
+			return
+		}
+		if startBlockHeight > (currBlockHeight + 1) {
+			log.Errorf("import block error: StartBlockHeight:%d larger than NextBlockHeight:%d", startBlockHeight, currBlockHeight+1)
+			return
+		}
+		for i := uint32(startBlockHeight); i <= endBlockHeight; i++ {
+			size, err := serialization.ReadUint32(fReader)
+			if err != nil {
+				log.Errorf("read block height:%d error:%s", i, err)
+				return
+			}
+			compressData := make([]byte, size)
+			_, err = io.ReadFull(fReader, compressData)
+			if err != nil {
+				log.Errorf("read block data height:%d error:%s", i, err)
+				return
+			}
+			if i <= currBlockHeight {
+				continue
+			}
+			blockData, err := utils.DecompressBlockData(compressData, metadata.CompressType)
+			if err != nil {
+				log.Errorf("block height:%d decompress error:%s", i, err)
+				return
+			}
+			block, err := types.BlockFromRawBytes(blockData)
+			if err != nil {
+				log.Errorf("block height:%d deserialize error:%s", i, err)
+				return
+			}
+			err = ldg2.AddBlock(block)
+			if err != nil {
+				log.Errorf("add block height:%d error:%s", i, err)
+				return
+			}
 		}
 	}
 	store2 := ldg2.GetStore().GetStateStore()
