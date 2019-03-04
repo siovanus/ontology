@@ -220,6 +220,9 @@ func startOntology(ctx *cli.Context) {
 			return
 		}
 		for i := uint32(startBlockHeight); i <= endBlockHeight; i++ {
+			if i % 100000 == 0 {
+				log.Infof("Height:", i)
+			}
 			size, err := serialization.ReadUint32(fReader)
 			if err != nil {
 				log.Errorf("read block height:%d error:%s", i, err)
