@@ -33,11 +33,15 @@ import (
 	"github.com/ontio/ontology/vm/neovm/types"
 )
 
-func GetPeerPoolMap(native *native.NativeService, contract common.Address) (*PeerPoolMap, error) {
+func GetPeerPoolMap(native *native.NativeService, contract common.Address, view uint32) (*PeerPoolMap, error) {
 	peerPoolMap := &PeerPoolMap{
 		PeerPoolMap: make(map[string]*PeerPoolItem),
 	}
-	peerPoolMapBytes, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(PEER_POOL)))
+	viewBytes, err := utils.GetUint32Bytes(view)
+	if err != nil {
+		return nil, fmt.Errorf("getUint32Bytes, getUint32Bytes error: %v", err)
+	}
+	peerPoolMapBytes, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(PEER_POOL), viewBytes))
 	if err != nil {
 		return nil, fmt.Errorf("getPeerPoolMap, get all peerPoolMap error: %v", err)
 	}
@@ -56,12 +60,16 @@ func GetPeerPoolMap(native *native.NativeService, contract common.Address) (*Pee
 	return peerPoolMap, nil
 }
 
-func putPeerPoolMap(native *native.NativeService, contract common.Address, peerPoolMap *PeerPoolMap) error {
+func putPeerPoolMap(native *native.NativeService, contract common.Address, view uint32, peerPoolMap *PeerPoolMap) error {
 	bf := new(bytes.Buffer)
 	if err := peerPoolMap.Serialize(bf); err != nil {
 		return fmt.Errorf("serialize, serialize peerPoolMap error: %v", err)
 	}
-	native.CacheDB.Put(utils.ConcatKey(contract, []byte(PEER_POOL)), cstates.GenRawStorageItem(bf.Bytes()))
+	viewBytes, err := utils.GetUint32Bytes(view)
+	if err != nil {
+		return fmt.Errorf("getUint32Bytes, get viewBytes error: %v", err)
+	}
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(PEER_POOL), viewBytes), cstates.GenRawStorageItem(bf.Bytes()))
 	return nil
 }
 

@@ -128,7 +128,7 @@ func InitConfig(native *native.NativeService) ([]byte, error) {
 	}
 
 	//init peer pool
-	err = putPeerPoolMap(native, contract, peerPoolMap)
+	err = putPeerPoolMap(native, contract, view, peerPoolMap)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("putPeerPoolMap, put peerPoolMap error: %v", err)
 	}
@@ -259,7 +259,7 @@ func CommitDpos(native *native.NativeService) ([]byte, error) {
 	if len(peerPoolMap.PeerPoolMap) < int(config.K) {
 		return utils.BYTE_FALSE, fmt.Errorf("length of peer pool map is less than config.K")
 	}
-	err = putPeerPoolMap(native, contract, peerPoolMap)
+	err = putPeerPoolMap(native, contract, commitDposParam.GovernanceView.View, peerPoolMap)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("putPeerPoolMap, put peerPoolMap error: %v", err)
 	}
@@ -270,11 +270,15 @@ func splitFee(native *native.NativeService, contract common.Address) error {
 	// get config
 	config, err := getConfig(native, contract)
 	if err != nil {
-		return fmt.Errorf("getConfig, get config error: %v", err)
+		return fmt.Errorf("splitFee, get config error: %v", err)
 	}
 
+	view, err := GetView(native, contract)
+	if err != nil {
+		return fmt.Errorf("splitFee, get view error: %v", err)
+	}
 	//get peerPoolMap
-	peerPoolMap, err := GetPeerPoolMap(native, contract)
+	peerPoolMap, err := GetPeerPoolMap(native, contract, view)
 	if err != nil {
 		return fmt.Errorf("splitFee, get peerPoolMap error: %v", err)
 	}

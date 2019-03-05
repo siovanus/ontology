@@ -78,6 +78,38 @@ func DecodeAddress(source *common.ZeroCopySource) (common.Address, error) {
 	return common.AddressParseFromBytes(from)
 }
 
+func EncodeVarBytes(sink *common.ZeroCopySink, v []byte) (size uint64) {
+	return sink.WriteVarBytes(v)
+}
+
+func DecodeVarBytes(source *common.ZeroCopySource) ([]byte, error) {
+	v, _, irregular, eof := source.NextVarBytes()
+	if eof {
+		return nil, io.ErrUnexpectedEOF
+	}
+	if irregular {
+		return nil, common.ErrIrregularData
+	}
+
+	return v, nil
+}
+
+func EncodeString(sink *common.ZeroCopySink, str string) (size uint64) {
+	return sink.WriteVarBytes([]byte(str))
+}
+
+func DecodeString(source *common.ZeroCopySource) (string, error) {
+	str, _, irregular, eof := source.NextString()
+	if eof {
+		return "", io.ErrUnexpectedEOF
+	}
+	if irregular {
+		return "", common.ErrIrregularData
+	}
+
+	return str, nil
+}
+
 func EncodeUint256(sink *common.ZeroCopySink, hash common.Uint256) (size uint64) {
 	return sink.WriteVarBytes(hash[:])
 }
