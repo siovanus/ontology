@@ -26,30 +26,15 @@ import (
 	"github.com/ontio/ontology/common/constants"
 	"github.com/ontio/ontology/errors"
 	"github.com/ontio/ontology/smartcontract/service/native"
+	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
 )
 
 const (
-	//method
-	TRANSFER_NAME     = "transfer"
-	APPROVE_NAME      = "approve"
-	TRANSFERFROM_NAME = "transferFrom"
-	NAME_NAME         = "name"
-	SYMBOL_NAME       = "symbol"
-	DECIMALS_NAME     = "decimals"
-	TOTALSUPPLY_NAME  = "totalSupply"
-	BALANCEOF_NAME    = "balanceOf"
-	ALLOWANCE_NAME    = "allowance"
-	ONGX_UNLOCK       = "ongxUnlock"
-	ONGX_LOCK         = "ongxLock"
-
-	//prefix
-	TOTAL_SUPPLY_NAME = "totalSupply"
-	REQUEST_ID        = "requestID"
-
-	TRANSFER_FLAG byte = 1
-	APPROVE_FLAG  byte = 2
+	REQUEST_ID  = "requestID"
+	ONGX_UNLOCK = "ongxUnlock"
+	ONGX_LOCK   = "ongxLock"
 )
 
 func InitOngx() {
@@ -57,21 +42,21 @@ func InitOngx() {
 }
 
 func RegisterOngContract(native *native.NativeService) {
-	native.Register(TRANSFER_NAME, OngxTransfer)
-	native.Register(APPROVE_NAME, OngxApprove)
-	native.Register(TRANSFERFROM_NAME, OngxTransferFrom)
-	native.Register(NAME_NAME, OngxName)
-	native.Register(SYMBOL_NAME, OngxSymbol)
-	native.Register(DECIMALS_NAME, OngxDecimals)
-	native.Register(TOTALSUPPLY_NAME, OngxTotalSupply)
-	native.Register(BALANCEOF_NAME, OngxBalanceOf)
-	native.Register(ALLOWANCE_NAME, OngxAllowance)
+	native.Register(ont.TRANSFER_NAME, OngxTransfer)
+	native.Register(ont.APPROVE_NAME, OngxApprove)
+	native.Register(ont.TRANSFERFROM_NAME, OngxTransferFrom)
+	native.Register(ont.NAME_NAME, OngxName)
+	native.Register(ont.SYMBOL_NAME, OngxSymbol)
+	native.Register(ont.DECIMALS_NAME, OngxDecimals)
+	native.Register(ont.TOTALSUPPLY_NAME, OngxTotalSupply)
+	native.Register(ont.BALANCEOF_NAME, OngxBalanceOf)
+	native.Register(ont.ALLOWANCE_NAME, OngxAllowance)
 	native.Register(ONGX_UNLOCK, OngxUnlock)
 	native.Register(ONGX_LOCK, OngxLock)
 }
 
 func OngxTransfer(native *native.NativeService) ([]byte, error) {
-	var transfers Transfers
+	var transfers ont.Transfers
 	source := common.NewZeroCopySource(native.Input)
 	if err := transfers.Deserialization(source); err != nil {
 		return utils.BYTE_FALSE, errors.NewDetailErr(err, errors.ErrNoCode, "[OngTransfer] Transfers deserialize error!")
@@ -93,7 +78,7 @@ func OngxTransfer(native *native.NativeService) ([]byte, error) {
 }
 
 func OngxApprove(native *native.NativeService) ([]byte, error) {
-	var state State
+	var state ont.State
 	source := common.NewZeroCopySource(native.Input)
 	if err := state.Deserialization(source); err != nil {
 		return utils.BYTE_FALSE, errors.NewDetailErr(err, errors.ErrNoCode, "[OngApprove] state deserialize error!")
@@ -113,7 +98,7 @@ func OngxApprove(native *native.NativeService) ([]byte, error) {
 }
 
 func OngxTransferFrom(native *native.NativeService) ([]byte, error) {
-	var state TransferFrom
+	var state ont.TransferFrom
 	source := common.NewZeroCopySource(native.Input)
 	if err := state.Deserialization(source); err != nil {
 		return utils.BYTE_FALSE, errors.NewDetailErr(err, errors.ErrNoCode, "[OntTransferFrom] State deserialize error!")
@@ -128,7 +113,7 @@ func OngxTransferFrom(native *native.NativeService) ([]byte, error) {
 	if _, _, err := TransferedFrom(native, contract, &state); err != nil {
 		return utils.BYTE_FALSE, err
 	}
-	AddTransferNotifications(native, contract, &State{From: state.From, To: state.To, Value: state.Value})
+	AddTransferNotifications(native, contract, &ont.State{From: state.From, To: state.To, Value: state.Value})
 	return utils.BYTE_TRUE, nil
 }
 
@@ -154,11 +139,11 @@ func OngxTotalSupply(native *native.NativeService) ([]byte, error) {
 }
 
 func OngxBalanceOf(native *native.NativeService) ([]byte, error) {
-	return GetBalanceValue(native, TRANSFER_FLAG)
+	return GetBalanceValue(native, ont.TRANSFER_FLAG)
 }
 
 func OngxAllowance(native *native.NativeService) ([]byte, error) {
-	return GetBalanceValue(native, APPROVE_FLAG)
+	return GetBalanceValue(native, ont.APPROVE_FLAG)
 }
 
 func OngxUnlock(native *native.NativeService) ([]byte, error) {
@@ -189,7 +174,7 @@ func OngxUnlock(native *native.NativeService) ([]byte, error) {
 	if amount > constants.ONGX_TOTAL_SUPPLY {
 		return utils.BYTE_FALSE, fmt.Errorf("[OngSwap] total supply is more than constants.ONGX_TOTAL_SUPPLY")
 	}
-	AddOngxUnlockNotifications(native, context, &State{To: param.Addr, Value: param.Value})
+	AddOngxUnlockNotifications(native, context, &ont.State{To: param.Addr, Value: param.Value})
 
 	native.CacheDB.Put(totalSupplyKey, utils.GenUInt64StorageItem(amount).ToArray())
 	return utils.BYTE_TRUE, nil

@@ -26,7 +26,7 @@ import (
 	cstates "github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/auth"
-	"github.com/ontio/ontology/smartcontract/service/native/ongx"
+	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
@@ -198,13 +198,13 @@ func appCallTransferOng(native *native.NativeService, from common.Address, to co
 }
 
 func appCallTransfer(native *native.NativeService, contract common.Address, from common.Address, to common.Address, amount uint64) error {
-	var sts []ongx.State
-	sts = append(sts, ongx.State{
+	var sts []ont.State
+	sts = append(sts, ont.State{
 		From:  from,
 		To:    to,
 		Value: amount,
 	})
-	transfers := ongx.Transfers{
+	transfers := ont.Transfers{
 		States: sts,
 	}
 	sink := common.NewZeroCopySink(nil)

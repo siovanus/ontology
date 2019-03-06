@@ -30,6 +30,7 @@ import (
 	"github.com/ontio/ontology/errors"
 	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native"
+	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
 )
@@ -42,13 +43,13 @@ func GetBalanceValue(native *native.NativeService, flag byte) ([]byte, error) {
 	}
 	contract := native.ContextRef.CurrentContext().ContractAddress
 	var key []byte
-	if flag == APPROVE_FLAG {
+	if flag == ont.APPROVE_FLAG {
 		to, err := utils.DecodeAddress(source)
 		if err != nil {
 			return utils.BYTE_FALSE, errors.NewDetailErr(err, errors.ErrNoCode, "[GetBalanceValue] get from address error!")
 		}
 		key = GenApproveKey(contract, from, to)
-	} else if flag == TRANSFER_FLAG {
+	} else if flag == ont.TRANSFER_FLAG {
 		key = GenBalanceKey(contract, from)
 	}
 	amount, err := utils.GetStorageUInt64(native, key)
@@ -58,18 +59,18 @@ func GetBalanceValue(native *native.NativeService, flag byte) ([]byte, error) {
 	return types.BigIntToBytes(big.NewInt(int64(amount))), nil
 }
 
-func AddTransferNotifications(native *native.NativeService, contract common.Address, state *State) {
+func AddTransferNotifications(native *native.NativeService, contract common.Address, state *ont.State) {
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
 	native.Notifications = append(native.Notifications,
 		&event.NotifyEventInfo{
 			ContractAddress: contract,
-			States:          []interface{}{TRANSFER_NAME, state.From.ToBase58(), state.To.ToBase58(), state.Value},
+			States:          []interface{}{ont.TRANSFER_NAME, state.From.ToBase58(), state.To.ToBase58(), state.Value},
 		})
 }
 
-func AddOngxUnlockNotifications(native *native.NativeService, contract common.Address, state *State) {
+func AddOngxUnlockNotifications(native *native.NativeService, contract common.Address, state *ont.State) {
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
@@ -99,14 +100,14 @@ func GetToUInt64StorageItem(toBalance, value uint64) *cstates.StorageItem {
 }
 
 func GenTotalSupplyKey(contract common.Address) []byte {
-	return append(contract[:], TOTAL_SUPPLY_NAME...)
+	return append(contract[:], ont.TOTAL_SUPPLY_NAME...)
 }
 
 func GenBalanceKey(contract, addr common.Address) []byte {
 	return append(contract[:], addr[:]...)
 }
 
-func Transfer(native *native.NativeService, contract common.Address, state *State) (uint64, uint64, error) {
+func Transfer(native *native.NativeService, contract common.Address, state *ont.State) (uint64, uint64, error) {
 	if !native.ContextRef.CheckWitness(state.From) {
 		return 0, 0, errors.NewErr("authentication failed!")
 	}
@@ -128,7 +129,7 @@ func GenApproveKey(contract, from, to common.Address) []byte {
 	return append(temp, to[:]...)
 }
 
-func TransferedFrom(native *native.NativeService, currentContract common.Address, state *TransferFrom) (uint64, uint64, error) {
+func TransferedFrom(native *native.NativeService, currentContract common.Address, state *ont.TransferFrom) (uint64, uint64, error) {
 	if native.ContextRef.CheckWitness(state.Sender) == false {
 		return 0, 0, errors.NewErr("authentication failed!")
 	}
@@ -149,7 +150,7 @@ func TransferedFrom(native *native.NativeService, currentContract common.Address
 	return fromBalance, toBalance, nil
 }
 
-func genTransferFromKey(contract common.Address, state *TransferFrom) []byte {
+func genTransferFromKey(contract common.Address, state *ont.TransferFrom) []byte {
 	temp := append(contract[:], state.From[:]...)
 	return append(temp, state.Sender[:]...)
 }
