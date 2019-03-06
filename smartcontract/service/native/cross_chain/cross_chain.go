@@ -73,6 +73,7 @@ func CreateCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, putRequestID error:%s", err)
 	}
+	notifyCreateCrossChainTx(native, contract, params.SideChainID, newID, native.Height)
 	return utils.BYTE_TRUE, nil
 }
 
@@ -131,7 +132,7 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	for _, v := range params.Proof {
 		proof = append(proof, v)
 	}
-	key := utils.ConcatKey(utils.OngContractAddress, []byte(REQUEST), sideChainIDBytes, prefix)
+	key := utils.ConcatKey(utils.CrossChainContractAddress, []byte(REQUEST), sideChainIDBytes, prefix)
 	value, err := trie.VerifyProof(header.StatesRoot, key, proof)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("trie.VerifyProof, verify mpt proof error: %v", err)
@@ -151,6 +152,6 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 			return utils.BYTE_FALSE, fmt.Errorf("native.NativeCall, appCall error: %v", err)
 		}
 	}
-
+	notifyProcessCrossChainTx(native, contract, params.SideChainID, params.ID, params.Height)
 	return utils.BYTE_TRUE, nil
 }

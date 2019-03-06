@@ -22,7 +22,9 @@ import (
 	"fmt"
 
 	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/common/config"
 	cstates "github.com/ontio/ontology/core/states"
+	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
@@ -159,4 +161,26 @@ func getCurrentID(native *native.NativeService, contract common.Address, sideCha
 		}
 	}
 	return currentID, nil
+}
+
+func notifyCreateCrossChainTx(native *native.NativeService, contract common.Address, sideChainID uint32, requestID uint64, height uint32) {
+	if !config.DefConfig.Common.EnableEventLog {
+		return
+	}
+	native.Notifications = append(native.Notifications,
+		&event.NotifyEventInfo{
+			ContractAddress: contract,
+			States:          []interface{}{CREATE_CROSS_CHAIN_TX, sideChainID, requestID, height},
+		})
+}
+
+func notifyProcessCrossChainTx(native *native.NativeService, contract common.Address, sideChainID uint32, requestID uint64, height uint32) {
+	if !config.DefConfig.Common.EnableEventLog {
+		return
+	}
+	native.Notifications = append(native.Notifications,
+		&event.NotifyEventInfo{
+			ContractAddress: contract,
+			States:          []interface{}{PROCESS_CROSS_CHAIN_TX, sideChainID, requestID, height},
+		})
 }
