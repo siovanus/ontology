@@ -114,7 +114,7 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	}
 
 	//get block header
-	header, err := header_sync.GetHeaderByHeight(native, contract, params.SideChainID, params.Height)
+	header, err := header_sync.GetHeaderByHeight(native, params.SideChainID, params.Height)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("GetHeaderByHeight, get header by height error: %v", err)
 	}
@@ -125,7 +125,7 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	}
 	sideChainIDBytes, err := utils.GetUint32Bytes(config.DefConfig.Genesis.SideChainID)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, GetUint64Bytes error:%s", err)
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, GetUint32Bytes error:%s", err)
 	}
 	//verify mpt
 	proof := make([]rlp.RawValue, 0, len(params.Proof))

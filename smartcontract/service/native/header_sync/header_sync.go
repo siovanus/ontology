@@ -50,7 +50,6 @@ func RegisterHeaderSyncContract(native *native.NativeService) {
 }
 
 func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
-	contract := native.ContextRef.CurrentContext().ContractAddress
 	params := new(SyncBlockHeaderParam)
 	if err := params.Deserialize(bytes.NewBuffer(native.Input)); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, contract params deserialize error: %v", err)
@@ -60,19 +59,19 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, new_types.HeaderFromRawBytes error: %v", err)
 		}
-		_, err = GetHeaderByHeight(native, contract, header.SideChainID, header.Height)
+		_, err = GetHeaderByHeight(native, header.SideChainID, header.Height)
 		if err != nil {
 			continue
 		}
-		err = verifyHeader(native, contract, header)
+		err = verifyHeader(native, header)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, verifyHeader error: %v", err)
 		}
-		err = PutBlockHeader(native, contract, header)
+		err = PutBlockHeader(native, header)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, put BlockHeader error: %v", err)
 		}
-		err = UpdateConsensusPeer(native, contract, header)
+		err = UpdateConsensusPeer(native, header)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, update ConsensusPeer error: %v", err)
 		}

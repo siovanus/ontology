@@ -154,13 +154,13 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 	}
 
 	//block header storage
-	err = header_sync.PutBlockHeader(native, contract, header)
+	err = header_sync.PutBlockHeader(native, header)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, put blockHeader error: %v", err)
 	}
 
 	//consensus node pk storage
-	err = header_sync.UpdateConsensusPeer(native, contract, header)
+	err = header_sync.UpdateConsensusPeer(native, header)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, update ConsensusPeer error: %v", err)
 	}
