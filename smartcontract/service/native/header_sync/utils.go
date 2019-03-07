@@ -267,5 +267,5 @@ func findKeyHeight(native *native.NativeService, height uint32, sideChainID uint
 			return v, nil
 		}
 	}
-	return 0, fmt.Errorf("findKeyHeight, can find key height with height %d", height)
+	return 0, fmt.Errorf("findKeyHeight, can not find key height with height %d", height)
 }

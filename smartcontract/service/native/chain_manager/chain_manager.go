@@ -139,30 +139,18 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 
 	//side chain storage
 	sideChain := &SideChain{
-		SideChainID:  header.SideChainID,
-		Address:      params.Address,
-		Ratio:        uint64(params.Ratio),
-		Deposit:      uint64(params.Deposit),
-		OngNum:       0,
-		OngPool:      uint64(params.OngPool),
-		Status:       RegisterSideChainStatus,
-		GenesisBlock: params.GenesisBlockHeader,
+		SideChainID:        header.SideChainID,
+		Address:            params.Address,
+		Ratio:              uint64(params.Ratio),
+		Deposit:            uint64(params.Deposit),
+		OngNum:             0,
+		OngPool:            uint64(params.OngPool),
+		Status:             RegisterSideChainStatus,
+		GenesisBlockHeader: params.GenesisBlockHeader,
 	}
 	err = putSideChain(native, contract, sideChain)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, put sideChain error: %v", err)
-	}
-
-	//block header storage
-	err = header_sync.PutBlockHeader(native, header)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, put blockHeader error: %v", err)
-	}
-
-	//consensus node pk storage
-	err = header_sync.UpdateConsensusPeer(native, header)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, update ConsensusPeer error: %v", err)
 	}
 
 	//ong transfer
@@ -206,6 +194,22 @@ func ApproveSideChain(native *native.NativeService) ([]byte, error) {
 	err = putSideChain(native, contract, sideChain)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, put sideChain error: %v", err)
+	}
+
+	header, err := types.HeaderFromRawBytes(sideChain.GenesisBlockHeader)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, deserialize header err: %v", err)
+	}
+	//block header storage
+	err = header_sync.PutBlockHeader(native, header)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, put blockHeader error: %v", err)
+	}
+
+	//consensus node pk storage
+	err = header_sync.UpdateConsensusPeer(native, header)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, update ConsensusPeer error: %v", err)
 	}
 	return utils.BYTE_TRUE, nil
 }

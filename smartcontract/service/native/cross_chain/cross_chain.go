@@ -57,23 +57,22 @@ func CreateCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, contract params deserialize error: %v", err)
 	}
-	contract := native.ContextRef.CurrentContext().ContractAddress
 
 	//record cross chain tx
-	requestID, err := getRequestID(native, contract, params.SideChainID)
+	requestID, err := getRequestID(native, params.SideChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, getRequestID error:%s", err)
 	}
 	newID := requestID + 1
-	err = putRequest(native, contract, newID, native.Input, params.SideChainID)
+	err = putRequest(native, newID, native.Input, params.SideChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, putRequest error:%s", err)
 	}
-	err = putRequestID(native, contract, newID, params.SideChainID)
+	err = putRequestID(native, newID, params.SideChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, putRequestID error:%s", err)
 	}
-	notifyCreateCrossChainTx(native, contract, params.SideChainID, newID, native.Height)
+	notifyCreateCrossChainTx(native, params.SideChainID, newID, native.Height)
 	return utils.BYTE_TRUE, nil
 }
 
@@ -82,31 +81,30 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, contract params deserialize error: %v", err)
 	}
-	contract := native.ContextRef.CurrentContext().ContractAddress
 
 	//record done cross chain tx
-	oldCurrentID, err := getCurrentID(native, contract, params.SideChainID)
+	oldCurrentID, err := getCurrentID(native, params.SideChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, getCurrentID error: %v", err)
 	}
 	if params.ID > oldCurrentID {
-		err = putRemainedIDs(native, contract, params.ID, oldCurrentID, params.SideChainID)
+		err = putRemainedIDs(native, params.ID, oldCurrentID, params.SideChainID)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, putRemainedIDs error: %v", err)
 		}
-		err = putCurrentID(native, contract, params.ID, params.SideChainID)
+		err = putCurrentID(native, params.ID, params.SideChainID)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, putCurrentID error: %v", err)
 		}
 	} else {
-		ok, err := checkIfRemained(native, contract, params.ID, params.SideChainID)
+		ok, err := checkIfRemained(native, params.ID, params.SideChainID)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, checkIfRemained error: %v", err)
 		}
 		if !ok {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, tx already done")
 		} else {
-			err = removeRemained(native, contract, params.ID, params.SideChainID)
+			err = removeRemained(native, params.ID, params.SideChainID)
 			if err != nil {
 				return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, removeRemained error: %v", err)
 			}
@@ -152,6 +150,6 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 			return utils.BYTE_FALSE, fmt.Errorf("native.NativeCall, appCall error: %v", err)
 		}
 	}
-	notifyProcessCrossChainTx(native, contract, params.SideChainID, params.ID, params.Height)
+	notifyProcessCrossChainTx(native, params.SideChainID, params.ID, params.Height)
 	return utils.BYTE_TRUE, nil
 }

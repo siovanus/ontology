@@ -43,14 +43,14 @@ func (this *Status) Deserialize(source *common.ZeroCopySource) error {
 }
 
 type SideChain struct {
-	SideChainID  uint32         //side chain id
-	Address      common.Address //side chain admin
-	Ratio        uint64         //side chain ong ratio(ong:ongx)
-	Deposit      uint64         //side chain deposit
-	OngNum       uint64         //side chain ong num
-	OngPool      uint64         //side chain ong pool limit
-	Status       Status         //side chain status
-	GenesisBlock []byte         //side chain genesis block
+	SideChainID        uint32         //side chain id
+	Address            common.Address //side chain admin
+	Ratio              uint64         //side chain ong ratio(ong:ongx)
+	Deposit            uint64         //side chain deposit
+	OngNum             uint64         //side chain ong num
+	OngPool            uint64         //side chain ong pool limit
+	Status             Status         //side chain status
+	GenesisBlockHeader []byte         //side chain genesis block
 }
 
 func (this *SideChain) Serialize(sink *common.ZeroCopySink) {
@@ -61,7 +61,7 @@ func (this *SideChain) Serialize(sink *common.ZeroCopySink) {
 	sink.WriteUint64(this.OngNum)
 	sink.WriteUint64(this.OngPool)
 	this.Status.Serialize(sink)
-	sink.WriteVarBytes(this.GenesisBlock)
+	sink.WriteVarBytes(this.GenesisBlockHeader)
 }
 
 func (this *SideChain) Deserialize(source *common.ZeroCopySource) error {
@@ -94,12 +94,12 @@ func (this *SideChain) Deserialize(source *common.ZeroCopySource) error {
 	if err != nil {
 		return fmt.Errorf("status.Deserialize. deserialize status error: %v", err)
 	}
-	genesisBlock, _, irregular, eof := source.NextVarBytes()
+	genesisBlockHeader, _, irregular, eof := source.NextVarBytes()
 	if irregular {
-		return fmt.Errorf("source.NextVarBytes, deserialize genesisBlock error: %v", common.ErrIrregularData)
+		return fmt.Errorf("source.NextVarBytes, deserialize genesisBlockHeader error: %v", common.ErrIrregularData)
 	}
 	if eof {
-		return fmt.Errorf("source.NextVarBytes, deserialize genesisBlock error: %v", io.ErrUnexpectedEOF)
+		return fmt.Errorf("source.NextVarBytes, deserialize genesisBlockHeader error: %v", io.ErrUnexpectedEOF)
 	}
 	this.SideChainID = sideChainID
 	this.Address = address
@@ -108,7 +108,7 @@ func (this *SideChain) Deserialize(source *common.ZeroCopySource) error {
 	this.OngNum = ongNum
 	this.OngPool = ongPool
 	this.Status = *status
-	this.GenesisBlock = genesisBlock
+	this.GenesisBlockHeader = genesisBlockHeader
 	return nil
 }
 

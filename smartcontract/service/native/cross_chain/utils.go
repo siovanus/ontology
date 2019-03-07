@@ -21,7 +21,6 @@ package cross_chain
 import (
 	"fmt"
 
-	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	cstates "github.com/ontio/ontology/core/states"
 	"github.com/ontio/ontology/smartcontract/event"
@@ -29,7 +28,8 @@ import (
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
-func putRequestID(native *native.NativeService, contract common.Address, requestID uint64, sideChainID uint32) error {
+func putRequestID(native *native.NativeService, requestID uint64, sideChainID uint32) error {
+	contract := utils.CrossChainContractAddress
 	requestIDBytes, err := utils.GetUint64Bytes(requestID)
 	if err != nil {
 		return fmt.Errorf("putRequestID, get requestIDBytes error: %v", err)
@@ -42,7 +42,8 @@ func putRequestID(native *native.NativeService, contract common.Address, request
 	return nil
 }
 
-func getRequestID(native *native.NativeService, contract common.Address, sideChainID uint32) (uint64, error) {
+func getRequestID(native *native.NativeService, sideChainID uint32) (uint64, error) {
+	contract := utils.CrossChainContractAddress
 	sideChainIDBytes, err := utils.GetUint32Bytes(sideChainID)
 	if err != nil {
 		return 0, fmt.Errorf("getRequestID, get sideChainIDBytes error: %v", err)
@@ -65,7 +66,8 @@ func getRequestID(native *native.NativeService, contract common.Address, sideCha
 	return requestID, nil
 }
 
-func putRequest(native *native.NativeService, contract common.Address, requestID uint64, request []byte, sideChainID uint32) error {
+func putRequest(native *native.NativeService, requestID uint64, request []byte, sideChainID uint32) error {
+	contract := utils.CrossChainContractAddress
 	prefix, err := utils.GetUint64Bytes(requestID)
 	if err != nil {
 		return fmt.Errorf("putRequest, GetUint64Bytes error:%s", err)
@@ -79,7 +81,8 @@ func putRequest(native *native.NativeService, contract common.Address, requestID
 }
 
 //must be called before putCurrentID
-func putRemainedIDs(native *native.NativeService, contract common.Address, requestID, currentID uint64, sideChainID uint32) error {
+func putRemainedIDs(native *native.NativeService, requestID, currentID uint64, sideChainID uint32) error {
+	contract := utils.CrossChainContractAddress
 	for i := currentID + 1; i < requestID; i++ {
 		requestIDBytes, err := utils.GetUint64Bytes(i)
 		if err != nil {
@@ -94,7 +97,8 @@ func putRemainedIDs(native *native.NativeService, contract common.Address, reque
 	return nil
 }
 
-func checkIfRemained(native *native.NativeService, contract common.Address, requestID uint64, sideChainID uint32) (bool, error) {
+func checkIfRemained(native *native.NativeService, requestID uint64, sideChainID uint32) (bool, error) {
+	contract := utils.CrossChainContractAddress
 	sideChainIDBytes, err := utils.GetUint32Bytes(sideChainID)
 	if err != nil {
 		return false, fmt.Errorf("checkIfRemained, get sideChainIDBytes error: %v", err)
@@ -114,7 +118,8 @@ func checkIfRemained(native *native.NativeService, contract common.Address, requ
 	}
 }
 
-func removeRemained(native *native.NativeService, contract common.Address, requestID uint64, sideChainID uint32) error {
+func removeRemained(native *native.NativeService, requestID uint64, sideChainID uint32) error {
+	contract := utils.CrossChainContractAddress
 	sideChainIDBytes, err := utils.GetUint32Bytes(sideChainID)
 	if err != nil {
 		return fmt.Errorf("removeRemained, get sideChainIDBytes error: %v", err)
@@ -127,7 +132,8 @@ func removeRemained(native *native.NativeService, contract common.Address, reque
 	return nil
 }
 
-func putCurrentID(native *native.NativeService, contract common.Address, currentID uint64, sideChainID uint32) error {
+func putCurrentID(native *native.NativeService, currentID uint64, sideChainID uint32) error {
+	contract := utils.CrossChainContractAddress
 	currentIDBytes, err := utils.GetUint64Bytes(currentID)
 	if err != nil {
 		return fmt.Errorf("putCurrentID, get currentIDBytes error: %v", err)
@@ -140,7 +146,8 @@ func putCurrentID(native *native.NativeService, contract common.Address, current
 	return nil
 }
 
-func getCurrentID(native *native.NativeService, contract common.Address, sideChainID uint32) (uint64, error) {
+func getCurrentID(native *native.NativeService, sideChainID uint32) (uint64, error) {
+	contract := utils.CrossChainContractAddress
 	sideChainIDBytes, err := utils.GetUint32Bytes(sideChainID)
 	if err != nil {
 		return 0, fmt.Errorf("getCurrentID, get sideChainIDBytes error: %v", err)
@@ -163,7 +170,8 @@ func getCurrentID(native *native.NativeService, contract common.Address, sideCha
 	return currentID, nil
 }
 
-func notifyCreateCrossChainTx(native *native.NativeService, contract common.Address, sideChainID uint32, requestID uint64, height uint32) {
+func notifyCreateCrossChainTx(native *native.NativeService, sideChainID uint32, requestID uint64, height uint32) {
+	contract := utils.CrossChainContractAddress
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
@@ -174,7 +182,8 @@ func notifyCreateCrossChainTx(native *native.NativeService, contract common.Addr
 		})
 }
 
-func notifyProcessCrossChainTx(native *native.NativeService, contract common.Address, sideChainID uint32, requestID uint64, height uint32) {
+func notifyProcessCrossChainTx(native *native.NativeService, sideChainID uint32, requestID uint64, height uint32) {
+	contract := utils.CrossChainContractAddress
 	if !config.DefConfig.Common.EnableEventLog {
 		return
 	}
