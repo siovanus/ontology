@@ -839,9 +839,9 @@ func (this *LedgerStoreImp) saveBlock(block *types.Block, stateMerkleRoot common
 		return err
 	}
 
-	if result.MerkleRoot != stateMerkleRoot {
-		return errors.NewErr("state merkle root mismatch!")
-	}
+	//if result.MerkleRoot != stateMerkleRoot {
+	//	return errors.NewErr("state merkle root mismatch!")
+	//}
 
 	return this.submitBlock(block, result)
 }

@@ -19,44 +19,28 @@
 package main
 
 import (
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
-	"os/signal"
 	"runtime"
-	"strings"
-	"syscall"
 	"time"
 
-	"github.com/ontio/ontology-crypto/keypair"
-	"github.com/ontio/ontology-eventbus/actor"
 	alog "github.com/ontio/ontology-eventbus/log"
 	"github.com/ontio/ontology/account"
 	"github.com/ontio/ontology/cmd"
-	cmdcom "github.com/ontio/ontology/cmd/common"
 	"github.com/ontio/ontology/cmd/utils"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/log"
-	"github.com/ontio/ontology/consensus"
+	"github.com/ontio/ontology/common/password"
+	"github.com/ontio/ontology/consensus/vbft"
+	"github.com/ontio/ontology/consensus/vbft/config"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/ledger"
+	"github.com/ontio/ontology/core/signature"
+	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/events"
-	bactor "github.com/ontio/ontology/http/base/actor"
-	hserver "github.com/ontio/ontology/http/base/actor"
-	"github.com/ontio/ontology/http/jsonrpc"
-	"github.com/ontio/ontology/http/localrpc"
-	"github.com/ontio/ontology/http/nodeinfo"
-	"github.com/ontio/ontology/http/restful"
-	"github.com/ontio/ontology/http/websocket"
-	"github.com/ontio/ontology/p2pserver"
-	netreqactor "github.com/ontio/ontology/p2pserver/actor/req"
-	p2pactor "github.com/ontio/ontology/p2pserver/actor/server"
-	"github.com/ontio/ontology/txnpool"
-	tc "github.com/ontio/ontology/txnpool/common"
-	"github.com/ontio/ontology/txnpool/proc"
-	"github.com/ontio/ontology/validator/stateful"
-	"github.com/ontio/ontology/validator/stateless"
 	"github.com/urfave/cli"
 )
 
@@ -149,49 +133,178 @@ func startOntology(ctx *cli.Context) {
 		log.Errorf("initConfig error:%s", err)
 		return
 	}
-	acc, err := initAccount(ctx)
-	if err != nil {
-		log.Errorf("initWallet error:%s", err)
-		return
-	}
 	stateHashHeight := config.GetStateHashCheckHeight(cfg.P2PNode.NetworkId)
 	ldg, err := initLedger(ctx, stateHashHeight)
 	if err != nil {
-		log.Errorf("%s", err)
+		log.Errorf("initLedger error: %s", err)
 		return
 	}
 	defer ldg.Close()
-	txpool, err := initTxPool(ctx)
-	if err != nil {
-		log.Errorf("initTxPool error:%s", err)
-		return
+	log.Infof("current block height is :%d", ldg.GetCurrentBlockHeight())
+	var singers []*account.Account
+	paths := []string{
+		"wallet1.dat",
+		"wallet2.dat",
+		"wallet3.dat",
+		"wallet4.dat",
+		"wallet5.dat",
+		"wallet6.dat",
+		"wallet7.dat",
 	}
-	p2pSvr, p2pPid, err := initP2PNode(ctx, txpool)
-	if err != nil {
-		log.Errorf("initP2PNode error:%s", err)
-		return
+	for _, path := range paths {
+		wallet, err := account.Open(path)
+		if err != nil {
+			log.Errorf("open wallet error:%s", err)
+			return
+		}
+		pwd, err := password.GetPassword()
+		if err != nil {
+			log.Errorf("getPassword error:%s", err)
+			return
+		}
+		acc, err := wallet.GetDefaultAccount(pwd)
+		if err != nil {
+			log.Errorf("wallet.GetDefaultAccount error:%s", err)
+			return
+		}
+		singers = append(singers, acc)
 	}
-	_, err = initConsensus(ctx, p2pPid, txpool, acc)
-	if err != nil {
-		log.Errorf("initConsensus error:%s", err)
-		return
+	for i := 0; i < 200000; i++ {
+		if i % 10000 == 0 {
+			log.Infof("current Height is :%d", i)
+		}
+		currentHeight := ldg.GetCurrentBlockHeight()
+		preBlock, err := ldg.GetBlockByHeight(currentHeight)
+		if err != nil {
+			log.Errorf("ldg.GetBlockByHeight error: %s", err)
+			return
+		}
+		block, err := buildEmptyBlock(preBlock, singers)
+		if err != nil {
+			log.Errorf("buildEmptyBlock error:%s", err)
+			return
+		}
+		ldg.AddBlock(block, common.UINT256_EMPTY)
 	}
-	err = initRpc(ctx)
-	if err != nil {
-		log.Errorf("initRpc error:%s", err)
-		return
-	}
-	err = initLocalRpc(ctx)
-	if err != nil {
-		log.Errorf("initLocalRpc error:%s", err)
-		return
-	}
-	initRestful(ctx)
-	initWs(ctx)
-	initNodeInfo(ctx, p2pSvr)
+	fmt.Println("Done")
+}
 
-	go logCurrBlockHeight()
-	waitToExit()
+func buildEmptyBlock(preBlock *types.Block, singers []*account.Account) (*types.Block, error) {
+	sysTxs := make([]*types.Transaction, 0)
+	consensusPayload, err := getconsensusPayload(preBlock)
+	if err != nil {
+		return nil, err
+	}
+	blocktimestamp := uint32(time.Now().Unix())
+	if preBlock.Header.Timestamp >= blocktimestamp {
+		blocktimestamp = preBlock.Header.Timestamp + 1
+	}
+	blk, err := constructBlock(singers, preBlock, blocktimestamp, sysTxs, consensusPayload)
+	if err != nil {
+		return nil, fmt.Errorf("constructBlock failed")
+	}
+	return blk, nil
+}
+
+//func buildCommitDposBlock(preBlock *types.Block, singers []*account.Account) (*types.Block, error) {
+//	sysTxs := make([]*types.Transaction, 0)
+//	tx, err := createGovernaceTransaction(preBlock.Header.Height + 1)
+//	if err != nil {
+//		return nil, err
+//	}
+//	sysTxs = append(sysTxs, tx)
+//	consensusPayload, err := getconsensusPayload(preBlock)
+//	if err != nil {
+//		return nil, err
+//	}
+//	blocktimestamp := uint32(time.Now().Unix())
+//	if preBlock.Header.Timestamp >= blocktimestamp {
+//		blocktimestamp = preBlock.Header.Timestamp + 1
+//	}
+//	blk, err := constructBlock(singers, preBlock, blocktimestamp, sysTxs, consensusPayload)
+//	if err != nil {
+//		return nil, fmt.Errorf("constructBlock failed")
+//	}
+//	return blk, nil
+//}
+//
+//func createGovernaceTransaction(blkNum uint32) (*types.Transaction, error) {
+//	mutable := cutils.BuildNativeTransaction(nutils.GovernanceContractAddress, governance.COMMIT_DPOS, []byte{})
+//	mutable.Nonce = blkNum
+//	tx, err := mutable.IntoImmutable()
+//	return tx, err
+//}
+
+func getconsensusPayload(blk *types.Block) ([]byte, error) {
+	block, err := initVbftBlock(blk)
+	if err != nil {
+		return nil, err
+	}
+	lastConfigBlkNum := block.Info.LastConfigBlockNum
+	if block.Info.NewChainConfig != nil {
+		lastConfigBlkNum = block.Block.Header.Height
+	}
+	vbftBlkInfo := &vconfig.VbftBlockInfo{
+		Proposer:           math.MaxUint32,
+		LastConfigBlockNum: lastConfigBlkNum,
+		NewChainConfig:     nil,
+	}
+	consensusPayload, err := json.Marshal(vbftBlkInfo)
+	if err != nil {
+		return nil, err
+	}
+	return consensusPayload, nil
+}
+
+func initVbftBlock(block *types.Block) (*vbft.Block, error) {
+	if block == nil {
+		return nil, fmt.Errorf("nil block in initVbftBlock")
+	}
+
+	blkInfo := &vconfig.VbftBlockInfo{}
+	if err := json.Unmarshal(block.Header.ConsensusPayload, blkInfo); err != nil {
+		return nil, fmt.Errorf("unmarshal blockInfo: %s", err)
+	}
+
+	return &vbft.Block{
+		Block: block,
+		Info:  blkInfo,
+	}, nil
+}
+
+func constructBlock(singers []*account.Account, preBlock *types.Block, blocktimestamp uint32, systxs []*types.Transaction, consensusPayload []byte) (*types.Block, error) {
+	txHash := []common.Uint256{}
+	for _, t := range systxs {
+		txHash = append(txHash, t.Hash())
+	}
+	txRoot := common.ComputeMerkleRoot(txHash)
+	blockRoot := ledger.DefLedger.GetBlockRootWithNewTxRoots(preBlock.Header.Height, []common.Uint256{preBlock.Header.TransactionsRoot, txRoot})
+
+	blkHeader := &types.Header{
+		PrevBlockHash:    preBlock.Hash(),
+		TransactionsRoot: txRoot,
+		BlockRoot:        blockRoot,
+		Timestamp:        blocktimestamp,
+		Height:           uint32(preBlock.Header.Height + 1),
+		ConsensusData:    common.GetNonce(),
+		ConsensusPayload: consensusPayload,
+	}
+	blk := &types.Block{
+		Header:       blkHeader,
+		Transactions: systxs,
+	}
+
+	blkHash := blk.Hash()
+	for _, singer := range singers {
+		sig, err := signature.Sign(singer, blkHash[:])
+		if err != nil {
+			return nil, fmt.Errorf("sign block failed, block hash：%x, error: %s", blkHash, err)
+		}
+		blkHeader.Bookkeepers = append(blkHeader.Bookkeepers, singer.PublicKey)
+		blkHeader.SigData = append(blkHeader.SigData, sig)
+	}
+
+	return blk, nil
 }
 
 func initLog(ctx *cli.Context) {
@@ -209,33 +322,6 @@ func initConfig(ctx *cli.Context) (*config.OntologyConfig, error) {
 	}
 	log.Infof("Config init success")
 	return cfg, nil
-}
-
-func initAccount(ctx *cli.Context) (*account.Account, error) {
-	if !config.DefConfig.Consensus.EnableConsensus {
-		return nil, nil
-	}
-	walletFile := ctx.GlobalString(utils.GetFlagName(utils.WalletFileFlag))
-	if walletFile == "" {
-		return nil, fmt.Errorf("Please config wallet file using --wallet flag")
-	}
-	if !common.FileExisted(walletFile) {
-		return nil, fmt.Errorf("Cannot find wallet file:%s. Please create wallet first", walletFile)
-	}
-
-	acc, err := cmdcom.GetAccount(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get account error:%s", err)
-	}
-	log.Infof("Using account:%s", acc.Address.ToBase58())
-
-	if config.DefConfig.Genesis.ConsensusType == config.CONSENSUS_TYPE_SOLO {
-		curPk := hex.EncodeToString(keypair.SerializePublicKey(acc.PublicKey))
-		config.DefConfig.Genesis.SOLO.Bookkeepers = []string{curPk}
-	}
-
-	log.Infof("Account init success")
-	return acc, nil
 }
 
 func initLedger(ctx *cli.Context, stateHashHeight uint32) (*ledger.Ledger, error) {
@@ -263,175 +349,4 @@ func initLedger(ctx *cli.Context, stateHashHeight uint32) (*ledger.Ledger, error
 
 	log.Infof("Ledger init success")
 	return ledger.DefLedger, nil
-}
-
-func initTxPool(ctx *cli.Context) (*proc.TXPoolServer, error) {
-	disablePreExec := ctx.GlobalBool(utils.GetFlagName(utils.TxpoolPreExecDisableFlag))
-	bactor.DisableSyncVerifyTx = ctx.GlobalBool(utils.GetFlagName(utils.DisableSyncVerifyTxFlag))
-	disableBroadcastNetTx := ctx.GlobalBool(utils.GetFlagName(utils.DisableBroadcastNetTxFlag))
-	txPoolServer, err := txnpool.StartTxnPoolServer(disablePreExec, disableBroadcastNetTx)
-	if err != nil {
-		return nil, fmt.Errorf("Init txpool error:%s", err)
-	}
-	stlValidator, _ := stateless.NewValidator("stateless_validator")
-	stlValidator.Register(txPoolServer.GetPID(tc.VerifyRspActor))
-	stlValidator2, _ := stateless.NewValidator("stateless_validator2")
-	stlValidator2.Register(txPoolServer.GetPID(tc.VerifyRspActor))
-	stfValidator, _ := stateful.NewValidator("stateful_validator")
-	stfValidator.Register(txPoolServer.GetPID(tc.VerifyRspActor))
-
-	hserver.SetTxnPoolPid(txPoolServer.GetPID(tc.TxPoolActor))
-	hserver.SetTxPid(txPoolServer.GetPID(tc.TxActor))
-
-	log.Infof("TxPool init success")
-	return txPoolServer, nil
-}
-
-func initP2PNode(ctx *cli.Context, txpoolSvr *proc.TXPoolServer) (*p2pserver.P2PServer, *actor.PID, error) {
-	if config.DefConfig.Genesis.ConsensusType == config.CONSENSUS_TYPE_SOLO {
-		return nil, nil, nil
-	}
-	p2p := p2pserver.NewServer()
-
-	p2pActor := p2pactor.NewP2PActor(p2p)
-	p2pPID, err := p2pActor.Start()
-	if err != nil {
-		return nil, nil, fmt.Errorf("p2pActor init error %s", err)
-	}
-	p2p.SetPID(p2pPID)
-	err = p2p.Start()
-	if err != nil {
-		return nil, nil, fmt.Errorf("p2p service start error %s", err)
-	}
-	netreqactor.SetTxnPoolPid(txpoolSvr.GetPID(tc.TxActor))
-	txpoolSvr.RegisterActor(tc.NetActor, p2pPID)
-	hserver.SetNetServerPID(p2pPID)
-	p2p.WaitForPeersStart()
-	log.Infof("P2P init success")
-	return p2p, p2pPID, nil
-}
-
-func initConsensus(ctx *cli.Context, p2pPid *actor.PID, txpoolSvr *proc.TXPoolServer, acc *account.Account) (consensus.ConsensusService, error) {
-	if !config.DefConfig.Consensus.EnableConsensus {
-		return nil, nil
-	}
-	pool := txpoolSvr.GetPID(tc.TxPoolActor)
-
-	consensusType := strings.ToLower(config.DefConfig.Genesis.ConsensusType)
-	consensusService, err := consensus.NewConsensusService(consensusType, acc, pool, nil, p2pPid)
-	if err != nil {
-		return nil, fmt.Errorf("NewConsensusService:%s error:%s", consensusType, err)
-	}
-	consensusService.Start()
-
-	netreqactor.SetConsensusPid(consensusService.GetPID())
-	hserver.SetConsensusPid(consensusService.GetPID())
-
-	log.Infof("Consensus init success")
-	return consensusService, nil
-}
-
-func initRpc(ctx *cli.Context) error {
-	if !config.DefConfig.Rpc.EnableHttpJsonRpc {
-		return nil
-	}
-	var err error
-	exitCh := make(chan interface{}, 0)
-	go func() {
-		err = jsonrpc.StartRPCServer()
-		close(exitCh)
-	}()
-
-	flag := false
-	select {
-	case <-exitCh:
-		if !flag {
-			return err
-		}
-	case <-time.After(time.Millisecond * 5):
-		flag = true
-	}
-	log.Infof("Rpc init success")
-	return nil
-}
-
-func initLocalRpc(ctx *cli.Context) error {
-	if !ctx.GlobalBool(utils.GetFlagName(utils.RPCLocalEnableFlag)) {
-		return nil
-	}
-	var err error
-	exitCh := make(chan interface{}, 0)
-	go func() {
-		err = localrpc.StartLocalServer()
-		close(exitCh)
-	}()
-
-	flag := false
-	select {
-	case <-exitCh:
-		if !flag {
-			return err
-		}
-	case <-time.After(time.Millisecond * 5):
-		flag = true
-	}
-
-	log.Infof("Local rpc init success")
-	return nil
-}
-
-func initRestful(ctx *cli.Context) {
-	if !config.DefConfig.Restful.EnableHttpRestful {
-		return
-	}
-	go restful.StartServer()
-
-	log.Infof("Restful init success")
-}
-
-func initWs(ctx *cli.Context) {
-	if !config.DefConfig.Ws.EnableHttpWs {
-		return
-	}
-	websocket.StartServer()
-
-	log.Infof("Ws init success")
-}
-
-func initNodeInfo(ctx *cli.Context, p2pSvr *p2pserver.P2PServer) {
-	if config.DefConfig.P2PNode.HttpInfoPort == 0 {
-		return
-	}
-	go nodeinfo.StartServer(p2pSvr.GetNetWork())
-
-	log.Infof("Nodeinfo init success")
-}
-
-func logCurrBlockHeight() {
-	ticker := time.NewTicker(config.DEFAULT_GEN_BLOCK_TIME * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			log.Infof("CurrentBlockHeight = %d", ledger.DefLedger.GetCurrentBlockHeight())
-			isNeedNewFile := log.CheckIfNeedNewFile()
-			if isNeedNewFile {
-				log.ClosePrintLog()
-				log.InitLog(int(config.DefConfig.Common.LogLevel), log.PATH, log.Stdout)
-			}
-		}
-	}
-}
-
-func waitToExit() {
-	exit := make(chan bool, 0)
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	go func() {
-		for sig := range sc {
-			log.Infof("Ontology received exit signal:%v.", sig.String())
-			close(exit)
-			break
-		}
-	}()
-	<-exit
 }
