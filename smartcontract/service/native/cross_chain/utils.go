@@ -109,7 +109,7 @@ func getRequestID(native *native.NativeService, chainID uint64) (uint64, error) 
 	return requestID, nil
 }
 
-func putRequest(native *native.NativeService, requestID uint64, request []byte, chainID uint64) error {
+func putRequest(native *native.NativeService, requestID uint64, chainID uint64, request []byte) error {
 	contract := utils.CrossChainContractAddress
 	prefix, err := utils.GetUint64Bytes(requestID)
 	if err != nil {

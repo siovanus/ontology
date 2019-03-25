@@ -25,9 +25,10 @@ import (
 )
 
 type CreateCrossChainTxParam struct {
-	OngxFee         uint64
-	Address         common.Address
-	ChainID         uint64
+	OngxFee uint64
+	Address common.Address
+
+	ToChainID       uint64
 	ContractAddress common.Address
 	FunctionName    string
 	Args            []byte
@@ -36,7 +37,8 @@ type CreateCrossChainTxParam struct {
 func (this *CreateCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
 	utils.EncodeVarUint(sink, this.OngxFee)
 	utils.EncodeAddress(sink, this.Address)
-	utils.EncodeVarUint(sink, this.ChainID)
+
+	utils.EncodeVarUint(sink, this.ToChainID)
 	utils.EncodeAddress(sink, this.ContractAddress)
 	utils.EncodeString(sink, this.FunctionName)
 	utils.EncodeVarBytes(sink, this.Args)
@@ -51,9 +53,10 @@ func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySour
 	if err != nil {
 		return fmt.Errorf("CreateCrossChainTxParam deserialize address error:%s", err)
 	}
-	chainID, err := utils.DecodeVarUint(source)
+
+	toChainID, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize chainID error:%s", err)
+		return fmt.Errorf("CreateCrossChainTxParam deserialize toChainID error:%s", err)
 	}
 	contractAddress, err := utils.DecodeAddress(source)
 	if err != nil {
@@ -69,7 +72,8 @@ func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySour
 	}
 	this.OngxFee = ongxFee
 	this.Address = address
-	this.ChainID = chainID
+
+	this.ToChainID = toChainID
 	this.ContractAddress = contractAddress
 	this.FunctionName = functionName
 	this.Args = args
@@ -77,64 +81,40 @@ func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySour
 }
 
 type ProcessCrossChainTxParam struct {
-	Address common.Address
-	ChainID uint64
-	ID      uint64
-	Height  uint32
-	Proof   [][]byte
-	Value   []byte
+	Address     common.Address
+	FromChainID uint64
+
+	Height uint32
+	Proof  string
 }
 
 func (this *ProcessCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
 	utils.EncodeAddress(sink, this.Address)
-	utils.EncodeVarUint(sink, this.ChainID)
-	utils.EncodeVarUint(sink, this.ID)
+	utils.EncodeVarUint(sink, this.FromChainID)
 	utils.EncodeVarUint(sink, uint64(this.Height))
-	utils.EncodeVarUint(sink, uint64(len(this.Proof)))
-	for _, v := range this.Proof {
-		utils.EncodeVarBytes(sink, v)
-	}
-	utils.EncodeVarBytes(sink, this.Value)
+	utils.EncodeString(sink, this.Proof)
 }
 
 func (this *ProcessCrossChainTxParam) Deserialization(source *common.ZeroCopySource) error {
 	address, err := utils.DecodeAddress(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize address error:%s", err)
+		return fmt.Errorf("ProcessCrossChainTxParam deserialize address error:%s", err)
 	}
-	chainID, err := utils.DecodeVarUint(source)
+	fromChainID, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize chainID error:%s", err)
-	}
-	id, err := utils.DecodeVarUint(source)
-	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize id error:%s", err)
+		return fmt.Errorf("ProcessCrossChainTxParam deserialize fromChainID error:%s", err)
 	}
 	height, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize height error:%s", err)
+		return fmt.Errorf("ProcessCrossChainTxParam deserialize height error:%s", err)
 	}
-	n, err := utils.DecodeVarUint(source)
+	proof, err := utils.DecodeString(source)
 	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize proof count error:%s", err)
-	}
-	var proof [][]byte
-	for i := 0; uint64(i) < n; i++ {
-		v, err := utils.DecodeVarBytes(source)
-		if err != nil {
-			return fmt.Errorf("OngUnlockParam deserialize proof error:%s", err)
-		}
-		proof = append(proof, v)
-	}
-	value, err := utils.DecodeVarBytes(source)
-	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize value error:%s", err)
+		return fmt.Errorf("ProcessCrossChainTxParam deserialize proof error:%s", err)
 	}
 	this.Address = address
-	this.ChainID = chainID
-	this.ID = id
+	this.FromChainID = fromChainID
 	this.Height = uint32(height)
 	this.Proof = proof
-	this.Value = value
 	return nil
 }

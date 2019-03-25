@@ -22,8 +22,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"crypto/sha256"
 	"math"
 
+	"fmt"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/serialization"
 )
