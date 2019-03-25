@@ -180,7 +180,7 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	}
 
 	//update side chain
-	sideChain, err := chain_manager.GetSideChain(native, params.ChainID)
+	sideChain, err := chain_manager.GetSideChain(native, params.ToChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, get sideChain error: %v", err)
 	}
@@ -205,12 +205,13 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong transfer error: %v", err)
 	}
-	notifyOngLock(native, contract, params.ChainID, params.Address, params.OngxAmount)
+	notifyOngLock(native, contract, params.ToChainID, params.Address, params.OngxAmount)
 
 	//call cross chain governance contract
 	crossChainParam := cross_chain.CreateCrossChainTxParam{
 		OngxFee:         params.OngxFee,
-		ChainID:         params.ChainID,
+		Address:         params.Address,
+		ToChainID:       params.ToChainID,
 		ContractAddress: utils.OngContractAddress,
 		FunctionName:    "ongUnlock",
 		Args:            native.Input,
@@ -237,12 +238,33 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, only cross chain contract can invoke")
 	}
 
-	//ong transfer
-	err = appCallTransferOng(native, utils.OngContractAddress, params.Address, params.OngxAmount)
+	//ong unlock
+	//get side chain
+	sideChain, err := chain_manager.GetSideChain(native, params.ToChainID)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("appCallTransferOng, ong transfer error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, get sideChain error: %v", err)
+	}
+	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, side chain status is not normal status")
+	}
+	ongAmount, ok := common.SafeMul(uint64(params.OngxAmount), sideChain.Ratio)
+	if ok {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, number is more than uint64")
+	}
+	if sideChain.OngNum < ongAmount {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, ong num in pool is not enough")
+	}
+	sideChain.OngNum = sideChain.OngNum - ongAmount
+	err = putSideChain(native, sideChain)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, put sideChain error: %v", err)
+	}
+	//ong transfer
+	err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongAmount)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
 	}
 
-	notifyOngUnlock(native, contract, params.ChainID, params.Address, params.OngxAmount)
+	notifyOngUnlock(native, contract, params.ToChainID, params.Address, params.OngxAmount)
 	return utils.BYTE_TRUE, nil
 }

@@ -19,13 +19,13 @@
 package merkle
 
 import (
-	"crypto/sha256"
 	"bytes"
+	"crypto/sha256"
 	"math"
 
+	"fmt"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/serialization"
-	"fmt"
 )
 
 const (
@@ -213,7 +213,7 @@ func MerkleProve(path []byte, root common.Uint256) []byte {
 	}
 	hash := HashLeaf(value)
 	size := int(source.Size() / (common.UINT256_SIZE + 1))
-	for i:=0;i<size;i++ {
+	for i := 0; i < size; i++ {
 		f, eof := source.NextByte()
 		if eof {
 			return nil
