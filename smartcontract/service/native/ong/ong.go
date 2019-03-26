@@ -205,7 +205,7 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong transfer error: %v", err)
 	}
-	notifyOngLock(native, contract, params.ToChainID, params.Address, params.OngxAmount)
+	notifyOngLock(native, contract, params.ToChainID, params.Address, ongAmount)
 
 	//call cross chain governance contract
 	crossChainParam := cross_chain.CreateCrossChainTxParam{
@@ -265,6 +265,6 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
 	}
 
-	notifyOngUnlock(native, contract, params.ToChainID, params.Address, params.OngxAmount)
+	notifyOngUnlock(native, contract, params.ToChainID, params.Address, ongAmount)
 	return utils.BYTE_TRUE, nil
 }

@@ -107,7 +107,7 @@ func CreateCrossChainTx(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong transfer error: %v", err)
 	}
 
-	notifyCreateCrossChainTx(native, params.ToChainID, newID, native.Height, params.OngxFee)
+	notifyCreateCrossChainTx(native, params.ToChainID, newID, native.Height, ongFee)
 	return utils.BYTE_TRUE, nil
 }
 
@@ -127,11 +127,11 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, proof hex.DecodeString error: %v", err)
 	}
-	value := merkle.MerkleProve(path, header.CrossStatesRoot)
-	if value == nil {
+	v := merkle.MerkleProve(path, header.CrossStatesRoot)
+	if v == nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, merkle.MerkleProve verify merkle proof error")
 	}
-	s := common.NewZeroCopySource(value)
+	s := common.NewZeroCopySource(v)
 	merkleValue := new(MerkleValue)
 	if err := merkleValue.Deserialization(s); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, deserialize merkleValue error:%s", err)
