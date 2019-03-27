@@ -57,34 +57,34 @@ func GetHeaderByHeight(native *native.NativeService, chainID uint64, height uint
 	contract := utils.HeaderSyncContractAddress
 	chainIDBytes, err := utils.GetUint64Bytes(chainID)
 	if err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, GetUint64Bytes error: %v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, GetUint64Bytes error: %v", err)
 	}
 	heightBytes, err := utils.GetUint32Bytes(height)
 	if err != nil {
-		return nil, fmt.Errorf("heightBytes, getUint32Bytes error: %v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, getUint32Bytes error: %v", err)
 	}
 	blockHashStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(HEADER_INDEX), chainIDBytes, heightBytes))
 	if err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, get blockHashStore error: %v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, get blockHashStore error: %v", err)
 	}
 	blockHashBytes, err := cstates.GetValueFromRawStorageItem(blockHashStore)
 	if err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, deserialize from raw storage item err:%v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, deserialize blockHashBytes from raw storage item err:%v", err)
 	}
 	header := new(types.Header)
 	headerStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(BLOCK_HEADER), chainIDBytes, blockHashBytes))
 	if err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, get headerStore error: %v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, get headerStore error: %v", err)
 	}
 	if headerStore == nil {
-		return nil, fmt.Errorf("GetHeaderByHash, can not find any records")
+		return nil, fmt.Errorf("GetHeaderByHeight, can not find any records")
 	}
 	headerBytes, err := cstates.GetValueFromRawStorageItem(headerStore)
 	if err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, deserialize from raw storage item err:%v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, deserialize headerBytes from raw storage item err:%v", err)
 	}
 	if err := header.Deserialization(common.NewZeroCopySource(headerBytes)); err != nil {
-		return nil, fmt.Errorf("GetHeaderByHash, deserialize header error: %v", err)
+		return nil, fmt.Errorf("GetHeaderByHeight, deserialize header error: %v", err)
 	}
 	return header, nil
 }
