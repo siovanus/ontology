@@ -67,6 +67,9 @@ func GetHeaderByHeight(native *native.NativeService, chainID uint64, height uint
 	if err != nil {
 		return nil, fmt.Errorf("GetHeaderByHeight, get blockHashStore error: %v", err)
 	}
+	if blockHashStore == nil {
+		return nil, fmt.Errorf("GetHeaderByHeight, can not find any index records")
+	}
 	blockHashBytes, err := cstates.GetValueFromRawStorageItem(blockHashStore)
 	if err != nil {
 		return nil, fmt.Errorf("GetHeaderByHeight, deserialize blockHashBytes from raw storage item err:%v", err)
@@ -77,7 +80,7 @@ func GetHeaderByHeight(native *native.NativeService, chainID uint64, height uint
 		return nil, fmt.Errorf("GetHeaderByHeight, get headerStore error: %v", err)
 	}
 	if headerStore == nil {
-		return nil, fmt.Errorf("GetHeaderByHeight, can not find any records")
+		return nil, fmt.Errorf("GetHeaderByHeight, can not find any header records")
 	}
 	headerBytes, err := cstates.GetValueFromRawStorageItem(headerStore)
 	if err != nil {

@@ -60,7 +60,7 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, new_types.HeaderFromRawBytes error: %v", err)
 		}
 		_, err = GetHeaderByHeight(native, header.ShardID, header.Height)
-		if err != nil {
+		if err == nil {
 			continue
 		}
 		err = verifyHeader(native, header)
