@@ -201,6 +201,10 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 		if _, err := native.NativeCall(destContractAddr, functionName, args); err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, native.NativeCall error: %v", err)
 		}
+	} else {
+		if _, err := native.NeoVMCall(destContractAddr, functionName, args); err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, native.NeoVMCall error: %v", err)
+		}
 	}
 	notifyProcessCrossChainTx(native, params.FromChainID, merkleValue.RequestID, params.Height, ongFee)
 	return utils.BYTE_TRUE, nil

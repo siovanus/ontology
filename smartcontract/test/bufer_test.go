@@ -1,9 +1,9 @@
 package test
 
 import (
-	"testing"
 	"fmt"
 	"github.com/ontio/ontology/common"
+	"testing"
 )
 
 func TestBufer(t *testing.T) {
