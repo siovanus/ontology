@@ -48,6 +48,16 @@ func NewLedger(dataDir string, stateHashHeight uint32) (*Ledger, error) {
 	}, nil
 }
 
+func NewLedger2(stateHashHeight uint32) (*Ledger, error) {
+	ldgStore, err := ledgerstore.NewLedgerStore2(stateHashHeight)
+	if err != nil {
+		return nil, fmt.Errorf("NewLedgerStore error %s", err)
+	}
+	return &Ledger{
+		ldgStore: ldgStore,
+	}, nil
+}
+
 func (self *Ledger) GetStore() store.LedgerStore {
 	return self.ldgStore
 }

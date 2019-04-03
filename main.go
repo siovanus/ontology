@@ -28,7 +28,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/fdlimit"
+	"bufio"
+	"crypto/md5"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology-eventbus/actor"
 	alog "github.com/ontio/ontology-eventbus/log"
@@ -39,10 +40,12 @@ import (
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/log"
+	"github.com/ontio/ontology/common/serialization"
 	"github.com/ontio/ontology/consensus"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/ledger"
-	"github.com/ontio/ontology/events"
+	scom "github.com/ontio/ontology/core/store/common"
+	"github.com/ontio/ontology/core/types"
 	bactor "github.com/ontio/ontology/http/base/actor"
 	hserver "github.com/ontio/ontology/http/base/actor"
 	"github.com/ontio/ontology/http/jsonrpc"
@@ -59,6 +62,11 @@ import (
 	"github.com/ontio/ontology/validator/stateful"
 	"github.com/ontio/ontology/validator/stateless"
 	"github.com/urfave/cli"
+	"io"
+	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
+	"strconv"
 )
 
 func setupAPP() *cli.App {
@@ -107,7 +115,6 @@ func setupAPP() *cli.App {
 		utils.NodePortFlag,
 		utils.ConsensusPortFlag,
 		utils.DualPortSupportFlag,
-		utils.HttpInfoPortFlag,
 		utils.MaxConnInBoundFlag,
 		utils.MaxConnOutBoundFlag,
 		utils.MaxConnInBoundForSingleIPFlag,
@@ -122,7 +129,6 @@ func setupAPP() *cli.App {
 		//rest setting
 		utils.RestfulEnableFlag,
 		utils.RestfulPortFlag,
-		utils.RestfulMaxConnsFlag,
 		//ws setting
 		utils.WsEnabledFlag,
 		utils.WsPortFlag,
@@ -135,6 +141,13 @@ func setupAPP() *cli.App {
 }
 
 func main() {
+	go func() {
+		http.HandleFunc("/goroutines", func(w http.ResponseWriter, r *http.Request) {
+			num := strconv.FormatInt(int64(runtime.NumGoroutine()), 10)
+			w.Write([]byte(num))
+		})
+		http.ListenAndServe("0.0.0.0:30336", nil)
+	}()
 	if err := setupAPP().Run(os.Args); err != nil {
 		cmd.PrintErrorMsg(err.Error())
 		os.Exit(1)
@@ -142,59 +155,117 @@ func main() {
 }
 
 func startOntology(ctx *cli.Context) {
-	initLog(ctx)
-
-	log.Infof("ontology version %s", config.Version)
-
-	setMaxOpenFiles()
-
+	t := time.Now()
 	cfg, err := initConfig(ctx)
 	if err != nil {
 		log.Errorf("initConfig error:%s", err)
 		return
 	}
-	acc, err := initAccount(ctx)
-	if err != nil {
-		log.Errorf("initWallet error:%s", err)
-		return
-	}
-	stateHashHeight := config.GetStateHashCheckHeight(cfg.P2PNode.NetworkId)
-	ldg, err := initLedger(ctx, stateHashHeight)
-	if err != nil {
-		log.Errorf("%s", err)
-		return
-	}
-	defer ldg.Close()
-	txpool, err := initTxPool(ctx)
-	if err != nil {
-		log.Errorf("initTxPool error:%s", err)
-		return
-	}
-	p2pSvr, p2pPid, err := initP2PNode(ctx, txpool)
-	if err != nil {
-		log.Errorf("initP2PNode error:%s", err)
-		return
-	}
-	_, err = initConsensus(ctx, p2pPid, txpool, acc)
-	if err != nil {
-		log.Errorf("initConsensus error:%s", err)
-		return
-	}
-	err = initRpc(ctx)
-	if err != nil {
-		log.Errorf("initRpc error:%s", err)
-		return
-	}
-	err = initLocalRpc(ctx)
-	if err != nil {
-		log.Errorf("initLocalRpc error:%s", err)
-		return
-	}
-	initRestful(ctx)
-	initWs(ctx)
-	initNodeInfo(ctx, p2pSvr)
 
-	go logCurrBlockHeight()
+	//old md5
+	//dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
+	//store1, err := leveldbstore.NewLevelDBStore(fmt.Sprintf("%s%s%s", dbDir, string(os.PathSeparator), ledgerstore.DBDirState))
+	//if err != nil {
+	//	log.Errorf("leveldbstore.NewLevelDBStore error:%s", err)
+	//	return
+	//}
+	//iter1 := store1.NewIterator([]byte{byte(scom.ST_STORAGE)})
+	//defer iter1.Release()
+	//m1 := md5.New()
+	//for iter1.Next() {
+	//	m1.Write(iter1.Key())
+	//	m1.Write(iter1.Value())
+	//}
+	//
+	////new md5
+	//dig1 := hex.EncodeToString(m1.Sum(nil))
+	stateHashHeight := config.GetStateHashCheckHeight(cfg.P2PNode.NetworkId)
+	ldg2, err := initLedger2(ctx, stateHashHeight)
+	if err != nil {
+		log.Errorf("initLedger2 error:%s", err)
+		return
+	}
+	defer ldg2.Close()
+	rd, err := ioutil.ReadDir("BlockFiles")
+	for _, fi := range rd {
+		ifile, err := os.OpenFile("BlockFiles/"+fi.Name(), os.O_RDONLY, 0644)
+		if err != nil {
+			log.Errorf("OpenFile error:%s", err)
+			return
+		}
+		log.Infof("OpenFile:%s", fi.Name())
+		defer ifile.Close()
+		fReader := bufio.NewReader(ifile)
+		metadata := utils.NewExportBlockMetadata()
+		err = metadata.Deserialize(fReader)
+		if err != nil {
+			log.Errorf("block data file metadata deserialize error:%s", err)
+			return
+		}
+		currBlockHeight := ldg2.GetCurrentBlockHeight()
+		startBlockHeight := metadata.StartBlockHeight
+		endBlockHeight := metadata.EndBlockHeight
+		if metadata.EndBlockHeight <= currBlockHeight {
+			log.Errorf("CurrentBlockHeight:%d larger than or equal to EndBlockHeight:%d, No blocks to import.", currBlockHeight, endBlockHeight)
+			return
+		}
+		if startBlockHeight > (currBlockHeight + 1) {
+			log.Errorf("import block error: StartBlockHeight:%d larger than NextBlockHeight:%d", startBlockHeight, currBlockHeight+1)
+			return
+		}
+		for i := uint32(startBlockHeight); i <= endBlockHeight; i++ {
+			if i%100000 == 0 {
+				log.Infof("Height:", i)
+			}
+			size, err := serialization.ReadUint32(fReader)
+			if err != nil {
+				log.Errorf("read block height:%d error:%s", i, err)
+				return
+			}
+			compressData := make([]byte, size)
+			_, err = io.ReadFull(fReader, compressData)
+			if err != nil {
+				log.Errorf("read block data height:%d error:%s", i, err)
+				return
+			}
+			if i <= currBlockHeight {
+				continue
+			}
+			blockData, err := utils.DecompressBlockData(compressData, metadata.CompressType)
+			if err != nil {
+				log.Errorf("block height:%d decompress error:%s", i, err)
+				return
+			}
+			block, err := types.BlockFromRawBytes(blockData)
+			if err != nil {
+				log.Errorf("block height:%d deserialize error:%s", i, err)
+				return
+			}
+			result, err := ldg2.ExecuteBlock(block)
+			if err != nil {
+				log.Errorf("ldg2.ExecuteBlock error:%s", err)
+				return
+			}
+			err = ldg2.SubmitBlock(block, result)
+			if err != nil {
+				log.Errorf("ldg2.ExecuteBlock error:%s", err)
+				return
+			}
+		}
+	}
+	store2 := ldg2.GetStore().GetStateStore()
+	iter2 := store2.NewIterator([]byte{byte(scom.ST_STORAGE)})
+	defer iter2.Release()
+	m2 := md5.New()
+	for iter2.Next() {
+		m2.Write(iter2.Key())
+		m2.Write(iter2.Value())
+	}
+	dig2 := hex.EncodeToString(m2.Sum(nil))
+	//log.Infof("md5 1 is:%s", dig1)
+	log.Infof("md5 2 is:%s", dig2)
+	elapsed := time.Since(t)
+	fmt.Println("app elapsed:", elapsed)
 	waitToExit()
 }
 
@@ -243,11 +314,34 @@ func initAccount(ctx *cli.Context) (*account.Account, error) {
 }
 
 func initLedger(ctx *cli.Context, stateHashHeight uint32) (*ledger.Ledger, error) {
-	events.Init() //Init event hub
-
 	var err error
 	dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
 	ledger.DefLedger, err = ledger.NewLedger(dbDir, stateHashHeight)
+	if err != nil {
+		return nil, fmt.Errorf("NewLedger error:%s", err)
+	}
+	bookKeepers, err := config.DefConfig.GetBookkeepers()
+	if err != nil {
+		return nil, fmt.Errorf("GetBookkeepers error:%s", err)
+	}
+	genesisConfig := config.DefConfig.Genesis
+	genesisBlock, err := genesis.BuildGenesisBlock(bookKeepers, genesisConfig)
+	if err != nil {
+		return nil, fmt.Errorf("genesisBlock error %s", err)
+	}
+	err = ledger.DefLedger.Init(bookKeepers, genesisBlock)
+	if err != nil {
+		return nil, fmt.Errorf("Init ledger error:%s", err)
+	}
+
+	log.Infof("Ledger init success")
+	return ledger.DefLedger, nil
+}
+
+func initLedger2(ctx *cli.Context, stateHashHeight uint32) (*ledger.Ledger, error) {
+	var err error
+	//dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
+	ledger.DefLedger, err = ledger.NewLedger2(stateHashHeight)
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}
@@ -423,19 +517,6 @@ func logCurrBlockHeight() {
 				log.InitLog(int(config.DefConfig.Common.LogLevel), log.PATH, log.Stdout)
 			}
 		}
-	}
-}
-
-func setMaxOpenFiles() {
-	max, err := fdlimit.Maximum()
-	if err != nil {
-		log.Errorf("failed to get maximum open files:%v", err)
-		return
-	}
-	_, err = fdlimit.Raise(uint64(max))
-	if err != nil {
-		log.Errorf("failed to set maximum open files:%v", err)
-		return
 	}
 }
 

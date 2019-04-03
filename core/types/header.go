@@ -98,18 +98,18 @@ func (bd *Header) Deserialization(source *common.ZeroCopySource) error {
 	}
 
 	for i := 0; i < int(n); i++ {
-		buf, _, irregular, eof := source.NextVarBytes()
+		_, _, irregular, eof := source.NextVarBytes()
 		if eof {
 			return io.ErrUnexpectedEOF
 		}
 		if irregular {
 			return common.ErrIrregularData
 		}
-		pubkey, err := keypair.DeserializePublicKey(buf)
-		if err != nil {
-			return err
-		}
-		bd.Bookkeepers = append(bd.Bookkeepers, pubkey)
+		//pubkey, err := keypair.DeserializePublicKey(buf)
+		//if err != nil {
+		//	return err
+		//}
+		//bd.Bookkeepers = append(bd.Bookkeepers, pubkey)
 	}
 
 	m, _, irregular, eof := source.NextVarUint()

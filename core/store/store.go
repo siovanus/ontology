@@ -27,6 +27,7 @@ import (
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/event"
 	cstates "github.com/ontio/ontology/smartcontract/states"
+	scom "github.com/ontio/ontology/core/store/common"
 )
 
 type ExecuteResult struct {
@@ -65,4 +66,5 @@ type LedgerStore interface {
 	PreExecuteContract(tx *types.Transaction) (*cstates.PreExecResult, error)
 	GetEventNotifyByTx(tx common.Uint256) (*event.ExecuteNotify, error)
 	GetEventNotifyByBlock(height uint32) ([]*event.ExecuteNotify, error)
+	GetStateStore() scom.PersistStore
 }
