@@ -22,11 +22,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/common/log"
 	"github.com/ontio/ontology/common/serialization"
 	"github.com/ontio/ontology/core/payload"
 	"github.com/ontio/ontology/core/states"
@@ -44,12 +42,12 @@ var (
 
 //StateStore saving the data of ledger states. Like balance of account, and the execution result of smart contract
 type StateStore struct {
-	dbDir                string                    //Store file path
-	store                scom.PersistStore         //Store handler
-	merklePath           string                    //Merkle tree store path
-	merkleTree           *merkle.CompactMerkleTree //Merkle tree of block root
-	deltaMerkleTree      *merkle.CompactMerkleTree //Merkle tree of delta state root
-	merkleHashStore      merkle.HashStore
+	dbDir           string                    //Store file path
+	store           scom.PersistStore         //Store handler
+	merklePath      string                    //Merkle tree store path
+	merkleTree      *merkle.CompactMerkleTree //Merkle tree of block root
+	deltaMerkleTree *merkle.CompactMerkleTree //Merkle tree of delta state root
+	//merkleHashStore      merkle.HashStore
 	stateHashCheckHeight uint32
 }
 
@@ -63,16 +61,21 @@ func NewStateStore(dbDir, merklePath string, stateHashCheckHeight uint32) (*Stat
 	stateStore := &StateStore{
 		dbDir:                dbDir,
 		store:                store,
-		merklePath:           merklePath,
 		stateHashCheckHeight: stateHashCheckHeight,
 	}
-	_, height, err := stateStore.GetCurrentBlock()
-	if err != nil && err != scom.ErrNotFound {
-		return nil, fmt.Errorf("GetCurrentBlock error %s", err)
-	}
-	err = stateStore.init(height)
+	return stateStore, nil
+}
+
+//NewStateStore return state store instance
+func NewStateStore2(stateHashCheckHeight uint32) (*StateStore, error) {
+	var err error
+	store, err := leveldbstore.NewMemLevelDBStore()
 	if err != nil {
-		return nil, fmt.Errorf("init error %s", err)
+		return nil, err
+	}
+	stateStore := &StateStore{
+		store:                store,
+		stateHashCheckHeight: stateHashCheckHeight,
 	}
 	return stateStore, nil
 }
@@ -101,33 +104,6 @@ func (self *StateStore) BatchPutRawKeyVal(key, val []byte) {
 
 func (self *StateStore) BatchDeleteRawKey(key []byte) {
 	self.store.BatchDelete(key)
-}
-
-func (self *StateStore) init(currBlockHeight uint32) error {
-	treeSize, hashes, err := self.GetBlockMerkleTree()
-	if err != nil && err != scom.ErrNotFound {
-		return err
-	}
-	if treeSize > 0 && treeSize != currBlockHeight+1 {
-		return fmt.Errorf("merkle tree size is inconsistent with blockheight: %d", currBlockHeight+1)
-	}
-	self.merkleHashStore, err = merkle.NewFileHashStore(self.merklePath, treeSize)
-	if err != nil {
-		log.Warn("merkle store is inconsistent with ChainStore. persistence will be disabled")
-	}
-	self.merkleTree = merkle.NewTree(treeSize, hashes, self.merkleHashStore)
-
-	if currBlockHeight >= self.stateHashCheckHeight {
-		treeSize, hashes, err := self.GetStateMerkleTree()
-		if err != nil && err != scom.ErrNotFound {
-			return err
-		}
-		if treeSize > 0 && treeSize != currBlockHeight-self.stateHashCheckHeight+1 {
-			return fmt.Errorf("merkle tree size is inconsistent with blockheight: %d", currBlockHeight+1)
-		}
-		self.deltaMerkleTree = merkle.NewTree(treeSize, hashes, nil)
-	}
-	return nil
 }
 
 //GetStateMerkleTree return merkle tree size an tree node
@@ -412,7 +388,7 @@ func (self *StateStore) ClearAll() error {
 
 //Close state store
 func (self *StateStore) Close() error {
-	self.merkleHashStore.Close()
+	//self.merkleHashStore.Close()
 	return self.store.Close()
 }
 

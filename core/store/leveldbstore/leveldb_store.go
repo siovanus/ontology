@@ -75,6 +75,7 @@ func NewLevelDBStore(file string) (*LevelDBStore, error) {
 }
 
 func NewMemLevelDBStore() (*LevelDBStore, error) {
+	//	return NewLevelDBStore(file)
 	store := storage.NewMemStorage()
 	// default Options
 	o := opt.Options{

@@ -23,6 +23,7 @@ import (
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/core/payload"
 	"github.com/ontio/ontology/core/states"
+	scom "github.com/ontio/ontology/core/store/common"
 	"github.com/ontio/ontology/core/store/overlaydb"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/event"
@@ -65,4 +66,5 @@ type LedgerStore interface {
 	PreExecuteContract(tx *types.Transaction) (*cstates.PreExecResult, error)
 	GetEventNotifyByTx(tx common.Uint256) (*event.ExecuteNotify, error)
 	GetEventNotifyByBlock(height uint32) ([]*event.ExecuteNotify, error)
+	GetStateStore() scom.PersistStore
 }

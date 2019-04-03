@@ -63,6 +63,29 @@ func NewBlockStore(dbDir string, enableCache bool) (*BlockStore, error) {
 	return blockStore, nil
 }
 
+//NewBlockStore return the block store instance
+func NewBlockStore2(enableCache bool) (*BlockStore, error) {
+	var cache *BlockCache
+	var err error
+	if enableCache {
+		cache, err = NewBlockCache()
+		if err != nil {
+			return nil, fmt.Errorf("NewBlockCache error %s", err)
+		}
+	}
+
+	store, err := leveldbstore.NewMemLevelDBStore()
+	if err != nil {
+		return nil, err
+	}
+	blockStore := &BlockStore{
+		enableCache: enableCache,
+		store:       store,
+		cache:       cache,
+	}
+	return blockStore, nil
+}
+
 //NewBatch start a commit batch
 func (this *BlockStore) NewBatch() {
 	this.store.NewBatch()
@@ -74,18 +97,18 @@ func (this *BlockStore) SaveBlock(block *types.Block) error {
 		this.cache.AddBlock(block)
 	}
 
-	blockHeight := block.Header.Height
+	//blockHeight := block.Header.Height
 	err := this.SaveHeader(block, 0)
 	if err != nil {
 		return fmt.Errorf("SaveHeader error %s", err)
 	}
-	for _, tx := range block.Transactions {
-		err = this.SaveTransaction(tx, blockHeight)
-		if err != nil {
-			txHash := tx.Hash()
-			return fmt.Errorf("SaveTransaction block height %d tx %s err %s", blockHeight, txHash.ToHexString(), err)
-		}
-	}
+	//for _, tx := range block.Transactions {
+	//	err = this.SaveTransaction(tx, blockHeight)
+	//	if err != nil {
+	//		txHash := tx.Hash()
+	//		return fmt.Errorf("SaveTransaction block height %d tx %s err %s", blockHeight, txHash.ToHexString(), err)
+	//	}
+	//}
 	return nil
 }
 
