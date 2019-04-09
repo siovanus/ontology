@@ -21,6 +21,7 @@ package cross_chain
 import (
 	"fmt"
 
+	"bytes"
 	"encoding/hex"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/merkle"
@@ -202,8 +203,16 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, native.NativeCall error: %v", err)
 		}
 	} else {
-		if _, err := native.NeoVMCall(destContractAddr, functionName, args); err != nil {
+		res, err := native.NeoVMCall(destContractAddr, functionName, args)
+		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, native.NeoVMCall error: %v", err)
+		}
+		valid, ok := res.([]byte)
+		if !ok {
+			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, return non-byte value")
+		}
+		if bytes.Compare(valid, utils.BYTE_TRUE) != 0 {
+			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, response is false")
 		}
 	}
 	notifyProcessCrossChainTx(native, params.FromChainID, merkleValue.RequestID, params.Height, ongFee)
