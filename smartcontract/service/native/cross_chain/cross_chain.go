@@ -19,16 +19,17 @@
 package cross_chain
 
 import (
-	"fmt"
-
-	"bytes"
 	"encoding/hex"
+	"fmt"
+	"math/big"
+
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/merkle"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/chain_manager"
 	"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
+	"github.com/ontio/ontology/vm/neovm/types"
 )
 
 const (
@@ -207,12 +208,13 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, native.NeoVMCall error: %v", err)
 		}
-		valid, ok := res.([]byte)
+		r, ok := res.(*types.Integer)
 		if !ok {
-			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, return non-byte value")
+			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, res of neo vm call must be bool")
 		}
-		if bytes.Compare(valid, utils.BYTE_TRUE) != 0 {
-			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, response is false")
+		v, _ := r.GetBigInteger()
+		if v.Cmp(new(big.Int).SetUint64(0)) == 0 {
+			return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, res of neo vm call is false")
 		}
 	}
 	notifyProcessCrossChainTx(native, params.FromChainID, merkleValue.RequestID, params.Height, ongFee)
