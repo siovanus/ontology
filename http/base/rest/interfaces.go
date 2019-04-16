@@ -20,6 +20,9 @@ package rest
 
 import (
 	"bytes"
+	"encoding/hex"
+	"strconv"
+
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/log"
@@ -29,8 +32,8 @@ import (
 	bactor "github.com/ontio/ontology/http/base/actor"
 	bcomn "github.com/ontio/ontology/http/base/common"
 	berr "github.com/ontio/ontology/http/base/error"
+	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
-	"strconv"
 )
 
 const TLS_PORT int = 443
@@ -578,5 +581,73 @@ func GetMemPoolTxState(cmd map[string]interface{}) map[string]interface{} {
 		attrs = append(attrs, bcomn.TXNAttrInfo{t.Height, int(t.Type), int(t.ErrCode)})
 	}
 	resp["Result"] = bcomn.TXNEntryInfo{attrs}
+	return resp
+}
+
+//get candidate and consensus peer from governance contract
+func GetGovernancePeers(cmd map[string]interface{}) map[string]interface{} {
+	resp := ResponsePack(berr.SUCCESS)
+	governanceViewBytes, err := bactor.GetStorageItem(utils.GovernanceContractAddress, []byte(governance.GOVERNANCE_VIEW))
+	if err != nil {
+		return ResponsePack(berr.INTERNAL_ERROR)
+	}
+	governanceView := new(governance.GovernanceView)
+	err = governanceView.Deserialize(bytes.NewBuffer(governanceViewBytes))
+	if err != nil {
+		return ResponsePack(berr.INTERNAL_ERROR)
+	}
+	viewBytes, err := governance.GetUint32Bytes(governanceView.View)
+	if err != nil {
+		return ResponsePack(berr.INTERNAL_ERROR)
+	}
+	value, err := bactor.GetStorageItem(utils.GovernanceContractAddress, append([]byte(governance.PEER_POOL), viewBytes...))
+	if err != nil {
+		return ResponsePack(berr.INTERNAL_ERROR)
+	}
+	peerPoolMap := new(governance.PeerPoolMap)
+	err = peerPoolMap.Deserialize(bytes.NewBuffer(value))
+	if err != nil {
+		return ResponsePack(berr.INTERNAL_ERROR)
+	}
+	governancePeers := make(map[string]*bcomn.GovernancePeer)
+	for k, v := range peerPoolMap.PeerPoolMap {
+		peerPubkeyPrefix, err := hex.DecodeString(k)
+		if err != nil {
+			return ResponsePack(berr.INTERNAL_ERROR)
+		}
+		value, err := bactor.GetStorageItem(utils.GovernanceContractAddress, append([]byte(governance.PEER_ATTRIBUTES), peerPubkeyPrefix...))
+		if err != nil {
+			if err != scom.ErrNotFound {
+				return ResponsePack(berr.INTERNAL_ERROR)
+			}
+		}
+		attr := &governance.PeerAttributes{
+			PeerPubkey:   k,
+			MaxAuthorize: 0,
+			T2PeerCost:   100,
+			T1PeerCost:   100,
+			TPeerCost:    100,
+		}
+		if value != nil {
+			err = attr.Deserialize(bytes.NewBuffer(value))
+			if err != nil {
+				return ResponsePack(berr.INTERNAL_ERROR)
+			}
+		}
+		governancePeer := &bcomn.GovernancePeer{
+			Index:        v.Index,
+			PeerPubkey:   v.PeerPubkey,
+			Address:      v.Address.ToBase58(),
+			Status:       v.Status,
+			InitPos:      v.InitPos,
+			TotalPos:     v.TotalPos,
+			MaxAuthorize: attr.MaxAuthorize,
+			T2PeerCost:   attr.T2PeerCost,
+			T1PeerCost:   attr.T1PeerCost,
+			TPeerCost:    attr.TPeerCost,
+		}
+		governancePeers[k] = governancePeer
+	}
+	resp["Result"] = governancePeers
 	return resp
 }

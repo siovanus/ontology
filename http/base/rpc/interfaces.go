@@ -31,6 +31,7 @@ import (
 	bactor "github.com/ontio/ontology/http/base/actor"
 	bcomn "github.com/ontio/ontology/http/base/common"
 	berr "github.com/ontio/ontology/http/base/error"
+	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
@@ -584,4 +585,69 @@ func GetGrantOng(params []interface{}) map[string]interface{} {
 		return responsePack(berr.INTERNAL_ERROR, "")
 	}
 	return responseSuccess(rsp)
+}
+
+func GetGovernancePeers(params []interface{}) map[string]interface{} {
+	governanceViewBytes, err := bactor.GetStorageItem(utils.GovernanceContractAddress, []byte(governance.GOVERNANCE_VIEW))
+	if err != nil {
+		return responsePack(berr.INTERNAL_ERROR, "")
+	}
+	governanceView := new(governance.GovernanceView)
+	err = governanceView.Deserialize(bytes.NewBuffer(governanceViewBytes))
+	if err != nil {
+		return responsePack(berr.INTERNAL_ERROR, "")
+	}
+	viewBytes, err := governance.GetUint32Bytes(governanceView.View)
+	if err != nil {
+		return responsePack(berr.INTERNAL_ERROR, "")
+	}
+	value, err := bactor.GetStorageItem(utils.GovernanceContractAddress, append([]byte(governance.PEER_POOL), viewBytes...))
+	if err != nil {
+		return responsePack(berr.INTERNAL_ERROR, "")
+	}
+	peerPoolMap := new(governance.PeerPoolMap)
+	err = peerPoolMap.Deserialize(bytes.NewBuffer(value))
+	if err != nil {
+		return responsePack(berr.INTERNAL_ERROR, "")
+	}
+	governancePeers := make(map[string]*bcomn.GovernancePeer)
+	for k, v := range peerPoolMap.PeerPoolMap {
+		peerPubkeyPrefix, err := hex.DecodeString(k)
+		if err != nil {
+			return responsePack(berr.INTERNAL_ERROR, "")
+		}
+		value, err := bactor.GetStorageItem(utils.GovernanceContractAddress, append([]byte(governance.PEER_ATTRIBUTES), peerPubkeyPrefix...))
+		if err != nil {
+			if err != scom.ErrNotFound {
+				return responsePack(berr.INTERNAL_ERROR, "")
+			}
+		}
+		attr := &governance.PeerAttributes{
+			PeerPubkey:   k,
+			MaxAuthorize: 0,
+			T2PeerCost:   100,
+			T1PeerCost:   100,
+			TPeerCost:    100,
+		}
+		if value != nil {
+			err = attr.Deserialize(bytes.NewBuffer(value))
+			if err != nil {
+				return responsePack(berr.INTERNAL_ERROR, "")
+			}
+		}
+		governancePeer := &bcomn.GovernancePeer{
+			Index:        v.Index,
+			PeerPubkey:   v.PeerPubkey,
+			Address:      v.Address.ToBase58(),
+			Status:       v.Status,
+			InitPos:      v.InitPos,
+			TotalPos:     v.TotalPos,
+			MaxAuthorize: attr.MaxAuthorize,
+			T2PeerCost:   attr.T2PeerCost,
+			T1PeerCost:   attr.T1PeerCost,
+			TPeerCost:    attr.TPeerCost,
+		}
+		governancePeers[k] = governancePeer
+	}
+	return responseSuccess(governancePeers)
 }

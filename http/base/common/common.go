@@ -35,6 +35,7 @@ import (
 	ontErrors "github.com/ontio/ontology/errors"
 	bactor "github.com/ontio/ontology/http/base/actor"
 	"github.com/ontio/ontology/smartcontract/event"
+	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	cstate "github.com/ontio/ontology/smartcontract/states"
@@ -168,6 +169,23 @@ type TXNAttrInfo struct {
 
 type TXNEntryInfo struct {
 	State []TXNAttrInfo // the result from each validator
+}
+
+type GovernancePeers struct {
+	GovernancePeerMap map[string]*GovernancePeer
+}
+
+type GovernancePeer struct {
+	Index        uint32            //peer index
+	PeerPubkey   string            //peer pubkey
+	Address      string            //peer owner
+	Status       governance.Status //peer status
+	InitPos      uint64            //peer initPos
+	TotalPos     uint64            //total authorize pos this peer received
+	MaxAuthorize uint64            //max authorzie pos this peer can receive(number of ont), set by peer owner
+	T2PeerCost   uint64            //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T + 2
+	T1PeerCost   uint64            //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T + 1
+	TPeerCost    uint64            //candidate or consensus node doesn't share income percent with authorize users, 100 means node will take all incomes, it will take effect in view T
 }
 
 func GetLogEvent(obj *event.LogEventArgs) (map[string]bool, LogEventArgs) {

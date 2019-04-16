@@ -75,6 +75,7 @@ const (
 	GET_MEMPOOL_TXSTATE   = "/api/v1/mempool/txstate/:hash"
 	GET_VERSION           = "/api/v1/version"
 	GET_NETWORKID         = "/api/v1/networkid"
+	GET_GOVERNANCE_PEERS  = "/api/v1/getgovernancepeers"
 
 	POST_RAW_TX = "/api/v1/transaction"
 )
@@ -155,6 +156,7 @@ func (this *restServer) registryMethod() {
 		GET_MEMPOOL_TXSTATE:   {name: "getmempooltxstate", handler: rest.GetMemPoolTxState},
 		GET_VERSION:           {name: "getversion", handler: rest.GetNodeVersion},
 		GET_NETWORKID:         {name: "getnetworkid", handler: rest.GetNetworkId},
+		GET_GOVERNANCE_PEERS:  {name: "getgovernancepeers", handler: rest.GetGovernancePeers},
 	}
 
 	postMethodMap := map[string]Action{
