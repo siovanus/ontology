@@ -37,6 +37,7 @@ const (
 	HEADER_INDEX   = "headerIndex"
 	CONSENSUS_PEER = "consensusPeer"
 	KEY_HEIGHTS    = "keyHeights"
+	SYNC_ADDRESS   = "syncAddress"
 )
 
 //Init governance contract address
@@ -71,7 +72,7 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, put BlockHeader error: %v", err)
 		}
-		err = UpdateConsensusPeer(native, header)
+		err = UpdateConsensusPeer(native, header, params.Address)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, update ConsensusPeer error: %v", err)
 		}

@@ -133,7 +133,7 @@ func RegisterMainChain(native *native.NativeService) ([]byte, error) {
 	}
 
 	//consensus node pk storage
-	err = header_sync.UpdateConsensusPeer(native, header)
+	err = header_sync.UpdateConsensusPeer(native, header, operatorAddress)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterMainChain, update ConsensusPeer error: %v", err)
 	}
@@ -215,14 +215,14 @@ func ApproveSideChain(native *native.NativeService) ([]byte, error) {
 	}
 
 	// get admin from database
-	adminAddress, err := global_params.GetStorageRole(native,
+	operatorAddress, err := global_params.GetStorageRole(native,
 		global_params.GenerateOperatorKey(utils.ParamContractAddress))
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, get admin error: %v", err)
 	}
 
 	//check witness
-	err = utils.ValidateOwner(native, adminAddress)
+	err = utils.ValidateOwner(native, operatorAddress)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, checkWitness error: %v", err)
 	}
@@ -253,7 +253,7 @@ func ApproveSideChain(native *native.NativeService) ([]byte, error) {
 	}
 
 	//consensus node pk storage
-	err = header_sync.UpdateConsensusPeer(native, header)
+	err = header_sync.UpdateConsensusPeer(native, header, operatorAddress)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ApproveSideChain, update ConsensusPeer error: %v", err)
 	}

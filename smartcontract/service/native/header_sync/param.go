@@ -25,10 +25,12 @@ import (
 )
 
 type SyncBlockHeaderParam struct {
+	Address common.Address
 	Headers [][]byte
 }
 
 func (this *SyncBlockHeaderParam) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeAddress(sink, this.Address)
 	utils.EncodeVarUint(sink, uint64(len(this.Headers)))
 	for _, v := range this.Headers {
 		utils.EncodeVarBytes(sink, v)
@@ -36,6 +38,10 @@ func (this *SyncBlockHeaderParam) Serialization(sink *common.ZeroCopySink) {
 }
 
 func (this *SyncBlockHeaderParam) Deserialization(source *common.ZeroCopySource) error {
+	address, err := utils.DecodeAddress(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeAddress, deserialize address error:%s", err)
+	}
 	n, err := utils.DecodeVarUint(source)
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize header count error:%s", err)
@@ -48,6 +54,7 @@ func (this *SyncBlockHeaderParam) Deserialization(source *common.ZeroCopySource)
 		}
 		headers = append(headers, header)
 	}
+	this.Address = address
 	this.Headers = headers
 	return nil
 }
