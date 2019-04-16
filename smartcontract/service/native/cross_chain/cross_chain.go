@@ -189,8 +189,19 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, put sideChain error: %v", err)
 	}
+
+	//get sync address
+	syncAddress, err := header_sync.GetSyncAddress(native, params.FromChainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, get syncAddress error: %v", err)
+	}
+
 	//ong transfer
-	err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongFee)
+	err = appCallTransferOng(native, utils.CrossChainContractAddress, syncAddress, ongFee/10)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
+	}
+	err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongFee-ongFee/10)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
 	}
