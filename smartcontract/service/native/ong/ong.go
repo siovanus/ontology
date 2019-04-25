@@ -201,7 +201,7 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	}
 
 	//ong transfer
-	err = appCallTransferOng(native, params.Address, utils.OngContractAddress, ongAmount)
+	err = appCallTransferOng(native, params.Address, utils.CrossChainContractAddress, ongAmount)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong transfer error: %v", err)
 	}
@@ -260,10 +260,26 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, put sideChain error: %v", err)
 	}
 	//ong transfer
-	err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongAmount)
+	//can not invoke transfer because ong contract want to transfer cross chain contract's asset
+	//err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongAmount)
+	//if err != nil {
+	//	return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
+	//}
+	value1, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...))
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, utils.GetStorageUInt64 error: %v", err)
 	}
+	if value1 < ongAmount {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, balance of CrossChainContractAddress insuffient")
+	}
+	item1 := utils.GenUInt64StorageItem(value1 - ongAmount)
+	native.CacheDB.Put(append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...), item1.ToArray())
+	value2, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], params.Address[:]...))
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, utils.GetStorageUInt64 error: %v", err)
+	}
+	item2 := utils.GenUInt64StorageItem(value2 + ongAmount)
+	native.CacheDB.Put(append(utils.OngContractAddress[:], params.Address[:]...), item2.ToArray())
 
 	notifyOngUnlock(native, contract, params.ToChainID, params.Address, ongAmount)
 	return utils.BYTE_TRUE, nil
