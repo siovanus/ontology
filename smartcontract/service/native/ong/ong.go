@@ -242,22 +242,22 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 	//get side chain
 	sideChain, err := chain_manager.GetSideChain(native, params.ToChainID)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, get sideChain error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, get sideChain error: %v", err)
 	}
 	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, side chain status is not normal status")
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, side chain status is not normal status")
 	}
 	ongAmount, ok := common.SafeMul(uint64(params.OngxAmount), sideChain.Ratio)
 	if ok {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, number is more than uint64")
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, number is more than uint64")
 	}
 	if sideChain.OngNum < ongAmount {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, ong num in pool is not enough")
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, ong num in pool is not enough")
 	}
 	sideChain.OngNum = sideChain.OngNum - ongAmount
 	err = putSideChain(native, sideChain)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, put sideChain error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, put sideChain error: %v", err)
 	}
 	//ong transfer
 	//can not invoke transfer because ong contract want to transfer cross chain contract's asset
@@ -267,16 +267,16 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 	//}
 	value1, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...))
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, utils.GetStorageUInt64 error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, utils.GetStorageUInt64 error: %v", err)
 	}
 	if value1 < ongAmount {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, balance of CrossChainContractAddress insuffient")
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, balance of CrossChainContractAddress insuffient")
 	}
 	item1 := utils.GenUInt64StorageItem(value1 - ongAmount)
 	native.CacheDB.Put(append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...), item1.ToArray())
 	value2, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], params.Address[:]...))
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, utils.GetStorageUInt64 error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, utils.GetStorageUInt64 error: %v", err)
 	}
 	item2 := utils.GenUInt64StorageItem(value2 + ongAmount)
 	native.CacheDB.Put(append(utils.OngContractAddress[:], params.Address[:]...), item2.ToArray())

@@ -69,9 +69,9 @@ func appCallVerifyToken(native *native.NativeService, contract common.Address, c
 	return nil
 }
 
-func GetMainChain(native *native.NativeService) (uint32, error) {
+func GetMainChain(native *native.NativeService) (uint64, error) {
 	contract := utils.ChainManagerContractAddress
-	mainChainStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(SIDE_CHAIN)))
+	mainChainStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(MAIN_CHAIN)))
 	if err != nil {
 		return 0, fmt.Errorf("get mainChainStore error: %v", err)
 	}
@@ -82,9 +82,9 @@ func GetMainChain(native *native.NativeService) (uint32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("GetMainChain, deserialize from raw storage item err:%v", err)
 	}
-	mainChainID, err := utils.GetBytesUint32(mainChainBytes)
+	mainChainID, err := utils.GetBytesUint64(mainChainBytes)
 	if err != nil {
-		return 0, fmt.Errorf("GetMainChain, utils.GetBytesUint32 err:%v", err)
+		return 0, fmt.Errorf("GetMainChain, utils.GetBytesUint64 err:%v", err)
 	}
 	return mainChainID, nil
 }
