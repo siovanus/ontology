@@ -25,23 +25,23 @@ import (
 )
 
 type OngLockParam struct {
-	OngxFee    uint64
-	ToChainID  uint64
-	Address    common.Address
-	OngxAmount uint64
+	Fee       uint64
+	ToChainID uint64
+	Address   common.Address
+	Amount    uint64
 }
 
 func (this *OngLockParam) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeVarUint(sink, this.OngxFee)
+	utils.EncodeVarUint(sink, this.Fee)
 	utils.EncodeVarUint(sink, this.ToChainID)
 	utils.EncodeAddress(sink, this.Address)
-	utils.EncodeVarUint(sink, this.OngxAmount)
+	utils.EncodeVarUint(sink, this.Amount)
 }
 
 func (this *OngLockParam) Deserialization(source *common.ZeroCopySource) error {
-	ongxFee, err := utils.DecodeVarUint(source)
+	fee, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("OngLockParam deserialize ongxFee error:%s", err)
+		return fmt.Errorf("OngLockParam deserialize fee error:%s", err)
 	}
 	toChainID, err := utils.DecodeVarUint(source)
 	if err != nil {
@@ -51,30 +51,44 @@ func (this *OngLockParam) Deserialization(source *common.ZeroCopySource) error {
 	if err != nil {
 		return fmt.Errorf("OngLockParam deserialize address error:%s", err)
 	}
-	ongxAmount, err := utils.DecodeVarUint(source)
+	amount, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("OngLockParam deserialize ongxAmount error:%s", err)
+		return fmt.Errorf("OngLockParam deserialize amount error:%s", err)
 	}
-	this.OngxFee = ongxFee
+	this.Fee = fee
 	this.ToChainID = toChainID
 	this.Address = address
-	this.OngxAmount = ongxAmount
+	this.Amount = amount
 	return nil
 }
 
 type OngUnlockParam struct {
-	Args []byte
+	FromChainID uint64
+	Address     common.Address
+	Amount      uint64
 }
 
 func (this *OngUnlockParam) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeVarBytes(sink, this.Args)
+	utils.EncodeVarUint(sink, this.FromChainID)
+	utils.EncodeAddress(sink, this.Address)
+	utils.EncodeVarUint(sink, this.Amount)
 }
 
 func (this *OngUnlockParam) Deserialization(source *common.ZeroCopySource) error {
-	args, err := utils.DecodeVarBytes(source)
+	fromChainID, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("OngUnlockParam deserialize sideChainID error:%s", err)
+		return fmt.Errorf("OngLockParam deserialize fromChainID error:%s", err)
 	}
-	this.Args = args
+	address, err := utils.DecodeAddress(source)
+	if err != nil {
+		return fmt.Errorf("OngLockParam deserialize address error:%s", err)
+	}
+	amount, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("OngLockParam deserialize amount error:%s", err)
+	}
+	this.FromChainID = fromChainID
+	this.Address = address
+	this.Amount = amount
 	return nil
 }

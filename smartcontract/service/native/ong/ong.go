@@ -187,7 +187,7 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, side chain status is not normal status")
 	}
-	ongAmount, ok := common.SafeMul(uint64(params.OngxAmount), sideChain.Ratio)
+	ongAmount, ok := common.SafeMul(uint64(params.Amount), sideChain.Ratio)
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("OngLock, number is more than uint64")
 	}
@@ -208,13 +208,20 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 	notifyOngLock(native, contract, params.ToChainID, params.Address, ongAmount)
 
 	//call cross chain governance contract
+	ongUnlockParam := &OngUnlockParam{
+		FromChainID: native.ShardID.ToUint64(),
+		Address:     params.Address,
+		Amount:      params.Amount,
+	}
+	args := common.NewZeroCopySink(nil)
+	ongUnlockParam.Serialization(args)
 	crossChainParam := cross_chain.CreateCrossChainTxParam{
-		OngxFee:         params.OngxFee,
+		Fee:             params.Fee,
 		Address:         params.Address,
 		ToChainID:       params.ToChainID,
 		ContractAddress: utils.OngContractAddress,
 		FunctionName:    "ongUnlock",
-		Args:            native.Input,
+		Args:            args.Bytes(),
 	}
 	sink := common.NewZeroCopySink(nil)
 	crossChainParam.Serialization(sink)
@@ -226,7 +233,7 @@ func OngLock(native *native.NativeService) ([]byte, error) {
 }
 
 func OngUnlock(native *native.NativeService) ([]byte, error) {
-	params := new(OngLockParam)
+	params := new(OngUnlockParam)
 	err := params.Deserialization(common.NewZeroCopySource(native.Input))
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, raw.Deserialization error: %v", err)
@@ -240,14 +247,14 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 
 	//ong unlock
 	//get side chain
-	sideChain, err := chain_manager.GetSideChain(native, params.ToChainID)
+	sideChain, err := chain_manager.GetSideChain(native, params.FromChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, get sideChain error: %v", err)
 	}
 	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, side chain status is not normal status")
 	}
-	ongAmount, ok := common.SafeMul(uint64(params.OngxAmount), sideChain.Ratio)
+	ongAmount, ok := common.SafeMul(uint64(params.Amount), sideChain.Ratio)
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, number is more than uint64")
 	}
@@ -281,6 +288,6 @@ func OngUnlock(native *native.NativeService) ([]byte, error) {
 	item2 := utils.GenUInt64StorageItem(value2 + ongAmount)
 	native.CacheDB.Put(append(utils.OngContractAddress[:], params.Address[:]...), item2.ToArray())
 
-	notifyOngUnlock(native, contract, params.ToChainID, params.Address, ongAmount)
+	notifyOngUnlock(native, contract, params.FromChainID, params.Address, ongAmount)
 	return utils.BYTE_TRUE, nil
 }

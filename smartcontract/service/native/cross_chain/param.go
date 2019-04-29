@@ -25,7 +25,7 @@ import (
 )
 
 type CreateCrossChainTxParam struct {
-	OngxFee uint64
+	Fee     uint64
 	Address common.Address
 
 	ToChainID       uint64
@@ -35,7 +35,7 @@ type CreateCrossChainTxParam struct {
 }
 
 func (this *CreateCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeVarUint(sink, this.OngxFee)
+	utils.EncodeVarUint(sink, this.Fee)
 	utils.EncodeAddress(sink, this.Address)
 
 	utils.EncodeVarUint(sink, this.ToChainID)
@@ -45,9 +45,9 @@ func (this *CreateCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
 }
 
 func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySource) error {
-	ongxFee, err := utils.DecodeVarUint(source)
+	fee, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize chainID error:%s", err)
+		return fmt.Errorf("CreateCrossChainTxParam deserialize fee error:%s", err)
 	}
 	address, err := utils.DecodeAddress(source)
 	if err != nil {
@@ -70,7 +70,7 @@ func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySour
 	if err != nil {
 		return fmt.Errorf("CreateCrossChainTxParam deserialize args error:%s", err)
 	}
-	this.OngxFee = ongxFee
+	this.Fee = fee
 	this.Address = address
 
 	this.ToChainID = toChainID

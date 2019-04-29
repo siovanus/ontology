@@ -91,7 +91,7 @@ func CreateCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, side chain status is not normal status")
 	}
-	ongFee, ok := common.SafeMul(uint64(params.OngxFee), sideChain.Ratio)
+	ongFee, ok := common.SafeMul(uint64(params.Fee), sideChain.Ratio)
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("CreateCrossChainTx, number is more than uint64")
 	}
@@ -177,7 +177,7 @@ func ProcessCrossChainTx(native *native.NativeService) ([]byte, error) {
 	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, side chain status is not normal status")
 	}
-	ongFee, ok := common.SafeMul(uint64(merkleValue.CreateCrossChainTxParam.OngxFee), sideChain.Ratio)
+	ongFee, ok := common.SafeMul(uint64(merkleValue.CreateCrossChainTxParam.Fee), sideChain.Ratio)
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, number is more than uint64")
 	}
