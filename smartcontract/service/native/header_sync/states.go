@@ -89,11 +89,11 @@ func (this *KeyHeights) Deserialization(source *common.ZeroCopySource) error {
 	return nil
 }
 
-type ConsensusPeer struct {
+type ConsensusPeers struct {
 	PeerMap map[string]*Peer
 }
 
-func (this *ConsensusPeer) Serialize(w io.Writer) error {
+func (this *ConsensusPeers) Serialize(w io.Writer) error {
 	if err := serialization.WriteUint32(w, uint32(len(this.PeerMap))); err != nil {
 		return fmt.Errorf("serialization.WriteUint32, serialize PeerMap length error: %v", err)
 	}
@@ -112,7 +112,7 @@ func (this *ConsensusPeer) Serialize(w io.Writer) error {
 	return nil
 }
 
-func (this *ConsensusPeer) Deserialize(r io.Reader) error {
+func (this *ConsensusPeers) Deserialize(r io.Reader) error {
 	n, err := serialization.ReadUint32(r)
 	if err != nil {
 		return fmt.Errorf("serialization.ReadUint32, deserialize PeerMap length error: %v", err)

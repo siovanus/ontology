@@ -27,7 +27,6 @@ import (
 )
 
 type RegisterSideChainParam struct {
-	Address            common.Address
 	Ratio              uint32
 	Deposit            uint64
 	OngPool            uint64
@@ -37,7 +36,6 @@ type RegisterSideChainParam struct {
 }
 
 func (this *RegisterSideChainParam) Serialization(sink *common.ZeroCopySink) error {
-	utils.EncodeAddress(sink, this.Address)
 	utils.EncodeVarUint(sink, uint64(this.Ratio))
 	utils.EncodeVarUint(sink, this.Deposit)
 	utils.EncodeVarUint(sink, this.OngPool)
@@ -48,10 +46,6 @@ func (this *RegisterSideChainParam) Serialization(sink *common.ZeroCopySink) err
 }
 
 func (this *RegisterSideChainParam) Deserialization(source *common.ZeroCopySource) error {
-	address, err := utils.DecodeAddress(source)
-	if err != nil {
-		return fmt.Errorf("utils.DecodeAddress, deserialize address error: %v", err)
-	}
 	ratio, err := utils.DecodeVarUint(source)
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize ratio error: %v", err)
@@ -82,7 +76,6 @@ func (this *RegisterSideChainParam) Deserialization(source *common.ZeroCopySourc
 	if keyNo > math.MaxUint32 {
 		return fmt.Errorf("initPos larger than max of uint32")
 	}
-	this.Address = address
 	this.Ratio = uint32(ratio)
 	this.Deposit = deposit
 	this.OngPool = ongPool
@@ -130,12 +123,10 @@ func (this *ChainIDParam) Deserialization(source *common.ZeroCopySource) error {
 
 type QuitSideChainParam struct {
 	ChainID uint64
-	Address common.Address
 }
 
 func (this *QuitSideChainParam) Serialization(sink *common.ZeroCopySink) error {
 	utils.EncodeVarUint(sink, this.ChainID)
-	utils.EncodeAddress(sink, this.Address)
 	return nil
 }
 
@@ -144,25 +135,18 @@ func (this *QuitSideChainParam) Deserialization(source *common.ZeroCopySource) e
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
 	}
-	address, err := utils.DecodeAddress(source)
-	if err != nil {
-		return fmt.Errorf("utils.DecodeAddress, deserialize address error: %v", err)
-	}
 	this.ChainID = chainID
-	this.Address = address
 	return nil
 }
 
 type InflationParam struct {
 	ChainID    uint64
-	Address    common.Address
 	DepositAdd uint64
 	OngPoolAdd uint64
 }
 
 func (this *InflationParam) Serialization(sink *common.ZeroCopySink) error {
 	utils.EncodeVarUint(sink, this.ChainID)
-	utils.EncodeAddress(sink, this.Address)
 	utils.EncodeVarUint(sink, this.DepositAdd)
 	utils.EncodeVarUint(sink, this.OngPoolAdd)
 	return nil
@@ -173,10 +157,6 @@ func (this *InflationParam) Deserialization(source *common.ZeroCopySource) error
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
 	}
-	address, err := utils.DecodeAddress(source)
-	if err != nil {
-		return fmt.Errorf("utils.DecodeAddress, deserialize address error: %v", err)
-	}
 	depositAdd, err := utils.DecodeVarUint(source)
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize depositAdd error: %v", err)
@@ -186,7 +166,6 @@ func (this *InflationParam) Deserialization(source *common.ZeroCopySource) error
 		return fmt.Errorf("utils.DecodeVarUint, deserialize ongPoolAdd error: %v", err)
 	}
 	this.ChainID = chainID
-	this.Address = address
 	this.DepositAdd = depositAdd
 	this.OngPoolAdd = ongPoolAdd
 	return nil
@@ -246,5 +225,37 @@ func (this *BlackSideChainParam) Deserialization(source *common.ZeroCopySource) 
 	}
 	this.ChainID = chainID
 	this.Address = address
+	return nil
+}
+
+type StakeSideChainParam struct {
+	ChainID uint64
+	Pubkey  string
+	Amount  uint64
+}
+
+func (this *StakeSideChainParam) Serialization(sink *common.ZeroCopySink) error {
+	utils.EncodeVarUint(sink, this.ChainID)
+	utils.EncodeString(sink, this.Pubkey)
+	utils.EncodeVarUint(sink, this.Amount)
+	return nil
+}
+
+func (this *StakeSideChainParam) Deserialization(source *common.ZeroCopySource) error {
+	chainID, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
+	}
+	pubkey, err := utils.DecodeString(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeString, deserialize pubkey error: %v", err)
+	}
+	amount, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize amount error: %v", err)
+	}
+	this.ChainID = chainID
+	this.Pubkey = pubkey
+	this.Amount = amount
 	return nil
 }

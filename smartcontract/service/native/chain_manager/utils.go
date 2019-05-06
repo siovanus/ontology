@@ -22,10 +22,14 @@ import (
 	"bytes"
 	"fmt"
 
+	"encoding/hex"
+	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology/common"
 	cstates "github.com/ontio/ontology/core/states"
+	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/auth"
+	"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
@@ -185,45 +189,74 @@ func putInflationInfo(native *native.NativeService, inflationInfo *InflationPara
 	return nil
 }
 
-func getSideChainNodeInfo(native *native.NativeService, chainID uint64) (*SideChainNodeInfo, error) {
+func GetStakeInfo(native *native.NativeService, chainID uint64, pubkey string) (*StakeSideChainParam, error) {
 	contract := utils.ChainManagerContractAddress
 	chainIDBytes, err := utils.GetUint64Bytes(chainID)
 	if err != nil {
 		return nil, fmt.Errorf("getUint64Bytes error: %v", err)
 	}
-	sideChainNodeInfoStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(SIDE_CHAIN_NODE_INFO), chainIDBytes))
+	pubkeyPrefix, err := hex.DecodeString(pubkey)
 	if err != nil {
-		return nil, fmt.Errorf("get sideChainNodeInfoStore error: %v", err)
+		return nil, fmt.Errorf("hex.DecodeString, pubkey format error: %v", err)
 	}
-	sideChainNodeInfo := &SideChainNodeInfo{
-		ChainID:     chainID,
-		NodeInfoMap: make(map[string]*NodeToSideChainParams),
+	stakeInfoStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(SIDE_CHAIN_STAKE_INFO), chainIDBytes, pubkeyPrefix))
+	if err != nil {
+		return nil, fmt.Errorf("get stakeInfoStore error: %v", err)
 	}
-	if sideChainNodeInfoStore != nil {
-		sideChainNodeInfoBytes, err := cstates.GetValueFromRawStorageItem(sideChainNodeInfoStore)
+	stakeInfo := new(StakeSideChainParam)
+	if stakeInfoStore != nil {
+		stakeInfoBytes, err := cstates.GetValueFromRawStorageItem(stakeInfoStore)
 		if err != nil {
-			return nil, fmt.Errorf("getSideChainNodeInfo, deserialize from raw storage item err:%v", err)
+			return nil, fmt.Errorf("getStakeInfo, deserialize from raw storage item err:%v", err)
 		}
-		if err := sideChainNodeInfo.Deserialization(common.NewZeroCopySource(sideChainNodeInfoBytes)); err != nil {
-			return nil, fmt.Errorf("deserialize, deserialize sideChainNodeInfo error: %v", err)
+		if err := stakeInfo.Deserialization(common.NewZeroCopySource(stakeInfoBytes)); err != nil {
+			return nil, fmt.Errorf("deserialize, deserialize stakeInfo error: %v", err)
 		}
 	}
-	return sideChainNodeInfo, nil
+	return stakeInfo, nil
 }
 
-func putSideChainNodeInfo(native *native.NativeService, sideChainNodeInfo *SideChainNodeInfo) error {
+func putStakeInfo(native *native.NativeService, stakeInfo *StakeSideChainParam) error {
 	contract := utils.ChainManagerContractAddress
 	sink := common.NewZeroCopySink(nil)
-	if err := sideChainNodeInfo.Serialization(sink); err != nil {
-		return fmt.Errorf("serialize, serialize sideChainNodeInfo error: %v", err)
+	if err := stakeInfo.Serialization(sink); err != nil {
+		return fmt.Errorf("serialize, serialize inflationInfo error: %v", err)
 	}
-	chainIDBytes, err := utils.GetUint64Bytes(sideChainNodeInfo.ChainID)
+	chainIDBytes, err := utils.GetUint64Bytes(stakeInfo.ChainID)
 	if err != nil {
 		return fmt.Errorf("getUint64Bytes error: %v", err)
 	}
-	native.CacheDB.Put(utils.ConcatKey(contract, []byte(SIDE_CHAIN_NODE_INFO), chainIDBytes),
+	pubkeyPrefix, err := hex.DecodeString(stakeInfo.Pubkey)
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString, pubkey format error: %v", err)
+	}
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(SIDE_CHAIN_STAKE_INFO), chainIDBytes, pubkeyPrefix),
 		cstates.GenRawStorageItem(sink.Bytes()))
 	return nil
+}
+
+func getConsensusMultiAddress(native *native.NativeService, chainID uint64) (common.Address, error) {
+	consensusPeers, err := header_sync.GetConsensusPeers(native, chainID)
+	if err != nil {
+		return common.ADDRESS_EMPTY, fmt.Errorf("getConsensusMultiAddress, header_sync.GetConsensusPeers error: %v", err)
+	}
+	var pubKeys []keypair.PublicKey
+	for pubkey := range consensusPeers.PeerMap {
+		vByte, err := hex.DecodeString(pubkey)
+		if err != nil {
+			return common.ADDRESS_EMPTY, fmt.Errorf("getConsensusMultiAddress, hex.DecodeString pubkey error: %v", err)
+		}
+		k, err := keypair.DeserializePublicKey(vByte)
+		if err != nil {
+			return common.ADDRESS_EMPTY, fmt.Errorf("getConsensusMultiAddress, keypair.DeserializePublicKey error: %v", err)
+		}
+		pubKeys = append(pubKeys, k)
+	}
+	address, err := types.AddressFromMultiPubKeys(pubKeys, (2*len(pubKeys)+2)/3)
+	if err != nil {
+		return common.ADDRESS_EMPTY, fmt.Errorf("getConsensusMultiAddress, types.AddressFromMultiPubKeys error: %v", err)
+	}
+	return address, nil
 }
 
 func appCallTransferOng(native *native.NativeService, from common.Address, to common.Address, amount uint64) error {

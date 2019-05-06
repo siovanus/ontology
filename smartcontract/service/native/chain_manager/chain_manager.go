@@ -22,13 +22,16 @@ import (
 	"bytes"
 	"fmt"
 
+	"encoding/hex"
+	"encoding/json"
+	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
 	"github.com/ontio/ontology/common/serialization"
+	"github.com/ontio/ontology/consensus/vbft/config"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/global_params"
-	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/header_sync"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
@@ -42,25 +45,26 @@ const (
 
 const (
 	//function name
-	INIT_CONFIG                 = "initConfig"
-	REGISTER_MAIN_CHAIN         = "registerMainChain"
-	REGISTER_SIDE_CHAIN         = "registerSideChain"
-	APPROVE_SIDE_CHAIN          = "approveSideChain"
-	REJECT_SIDE_CHAIN           = "rejectSideChain"
-	QUIT_SIDE_CHAIN             = "quitSideChain"
-	APPROVE_QUIT_SIDE_CHAIN     = "approveQuitSideChain"
-	BLACK_SIDE_CHAIN            = "blackSideChain"
-	INFLATION                   = "inflation"
-	APPROVE_INFLATION           = "approveInflation"
-	REJECT_INFLATION            = "rejectInflation"
-	REGISTER_NODE_TO_SIDE_CHAIN = "registerNodeToSideChain"
-	QUIT_NODE_TO_SIDE_CHAIN     = "quitNodeToSideChain"
+	INIT_CONFIG             = "initConfig"
+	REGISTER_MAIN_CHAIN     = "registerMainChain"
+	REGISTER_SIDE_CHAIN     = "registerSideChain"
+	APPROVE_SIDE_CHAIN      = "approveSideChain"
+	REJECT_SIDE_CHAIN       = "rejectSideChain"
+	QUIT_SIDE_CHAIN         = "quitSideChain"
+	APPROVE_QUIT_SIDE_CHAIN = "approveQuitSideChain"
+	BLACK_SIDE_CHAIN        = "blackSideChain"
+	STAKE_SIDE_CHAIN        = "stakeSideChain"
+	UNSTAKE_SIDE_CHAIN      = "unStakeSideChain"
+	INFLATION               = "inflation"
+	APPROVE_INFLATION       = "approveInflation"
+	REJECT_INFLATION        = "rejectInflation"
+	IF_STAKED               = "ifStaked"
 
 	//key prefix
-	MAIN_CHAIN           = "mainChain"
-	SIDE_CHAIN           = "sideChain"
-	INFLATION_INFO       = "inflationInfo"
-	SIDE_CHAIN_NODE_INFO = "sideChainNodeInfo"
+	MAIN_CHAIN            = "mainChain"
+	SIDE_CHAIN            = "sideChain"
+	INFLATION_INFO        = "inflationInfo"
+	SIDE_CHAIN_STAKE_INFO = "sideChainStakeInfo"
 )
 
 //Init governance contract address
@@ -78,11 +82,13 @@ func RegisterChainManagerContract(native *native.NativeService) {
 	native.Register(QUIT_SIDE_CHAIN, QuitSideChain)
 	native.Register(APPROVE_QUIT_SIDE_CHAIN, ApproveQuitSideChain)
 	native.Register(BLACK_SIDE_CHAIN, BlackSideChain)
+	native.Register(STAKE_SIDE_CHAIN, StakeSideChain)
+	native.Register(UNSTAKE_SIDE_CHAIN, UnStakeSideChain)
 	native.Register(INFLATION, Inflation)
 	native.Register(APPROVE_INFLATION, ApproveInflation)
 	native.Register(REJECT_INFLATION, RejectInflation)
-	native.Register(REGISTER_NODE_TO_SIDE_CHAIN, RegisterNodeToSideChain)
-	native.Register(QUIT_NODE_TO_SIDE_CHAIN, QuitNodeToSideChain)
+
+	native.Register(IF_STAKED, IfStaked)
 }
 
 func InitConfig(native *native.NativeService) ([]byte, error) {
@@ -160,12 +166,6 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, verifyToken failed: %v", err)
 	}
 
-	//check witness
-	err = utils.ValidateOwner(native, params.Address)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, checkWitness error: %v", err)
-	}
-
 	header, err := types.HeaderFromRawBytes(params.GenesisBlockHeader)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, deserialize header err: %v", err)
@@ -187,7 +187,6 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 	//side chain storage
 	sideChain := &SideChain{
 		ChainID:            header.ShardID,
-		Address:            params.Address,
 		Ratio:              uint64(params.Ratio),
 		Deposit:            uint64(params.Deposit),
 		OngNum:             0,
@@ -198,12 +197,6 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 	err = putSideChain(native, sideChain)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, put sideChain error: %v", err)
-	}
-
-	//ong transfer
-	err = appCallTransferOng(native, params.Address, utils.ChainManagerContractAddress, uint64(params.Deposit))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, ong transfer error: %v", err)
 	}
 	return utils.BYTE_TRUE, nil
 }
@@ -291,12 +284,6 @@ func RejectSideChain(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("RejectSideChain, deleteSideChain error: %v", err)
 	}
-
-	//ong transfer
-	err = appCallTransferOng(native, utils.ChainManagerContractAddress, sideChain.Address, sideChain.Deposit)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("RejectSideChain, ong transfer error: %v", err)
-	}
 	return utils.BYTE_TRUE, nil
 }
 
@@ -306,8 +293,14 @@ func QuitSideChain(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, contract params deserialize error: %v", err)
 	}
 
+	//get consensus multi sign address
+	address, err := getConsensusMultiAddress(native, params.ChainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, getConsensusMultiAddress error: %v", err)
+	}
+
 	//check witness
-	err := utils.ValidateOwner(native, params.Address)
+	err = utils.ValidateOwner(native, address)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, checkWitness error: %v", err)
 	}
@@ -319,9 +312,6 @@ func QuitSideChain(native *native.NativeService) ([]byte, error) {
 	}
 	if sideChain.ChainID != params.ChainID {
 		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, side chain is not registered")
-	}
-	if sideChain.Address != params.Address {
-		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, address is not side chain admin")
 	}
 	if sideChain.Status != SideChainStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("QuitSideChain, side chain is not side chain status")
@@ -369,12 +359,6 @@ func ApproveQuitSideChain(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ApproveQuitSideChain, deleteSideChain error: %v", err)
 	}
-
-	//ong transfer
-	err = appCallTransferOng(native, utils.ChainManagerContractAddress, sideChain.Address, sideChain.Deposit)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("ApproveQuitSideChain, ong transfer error: %v", err)
-	}
 	return utils.BYTE_TRUE, nil
 }
 
@@ -417,14 +401,124 @@ func BlackSideChain(native *native.NativeService) ([]byte, error) {
 	return utils.BYTE_TRUE, nil
 }
 
+func StakeSideChain(native *native.NativeService) ([]byte, error) {
+	params := new(StakeSideChainParam)
+	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, contract params deserialize error: %v", err)
+	}
+	pk, err := hex.DecodeString(params.Pubkey)
+	pubkey, err := keypair.DeserializePublicKey(pk)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, keypair.DeserializePublicKey error: %v", err)
+	}
+	address := types.AddressFromPubKey(pubkey)
+
+	//check witness
+	err = utils.ValidateOwner(native, address)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, validateOwner error: %v", err)
+	}
+
+	//transfer ong
+	err = appCallTransferOng(native, address, utils.ChainManagerContractAddress, params.Amount)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, ong transfer error: %v", err)
+	}
+
+	//put stake info into storage
+	stakeInfo, err := GetStakeInfo(native, params.ChainID, params.Pubkey)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, GetStakeInfo error: %v", err)
+	}
+	stakeInfo.ChainID = params.ChainID
+	stakeInfo.Pubkey = params.Pubkey
+	stakeInfo.Amount = stakeInfo.Amount + params.Amount
+
+	err = putStakeInfo(native, stakeInfo)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, putStakeInfo error: %v", err)
+	}
+	return utils.BYTE_TRUE, nil
+}
+
+func UnStakeSideChain(native *native.NativeService) ([]byte, error) {
+	params := new(StakeSideChainParam)
+	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, contract params deserialize error: %v", err)
+	}
+	pk, err := hex.DecodeString(params.Pubkey)
+	pubkey, err := keypair.DeserializePublicKey(pk)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("StakeSideChain, keypair.DeserializePublicKey error: %v", err)
+	}
+	address := types.AddressFromPubKey(pubkey)
+
+	//check witness
+	err = utils.ValidateOwner(native, address)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, validateOwner error: %v", err)
+	}
+
+	//check if consensus peer
+	consensusPeer, err := header_sync.GetConsensusPeers(native, params.ChainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, header_sync.GetConsensusPeers error: %v", err)
+	}
+	_, ok := consensusPeer.PeerMap[params.Pubkey]
+	if ok {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, peer is consensus peer now, can not unstake")
+	}
+
+	//update stake info
+	stakeInfo, err := GetStakeInfo(native, params.ChainID, params.Pubkey)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, GetStakeInfo error: %v", err)
+	}
+	stakeInfo.ChainID = params.ChainID
+	stakeInfo.Pubkey = params.Pubkey
+	if stakeInfo.Amount < params.Amount {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, stake is not enough to withdraw")
+	}
+	stakeInfo.Amount = stakeInfo.Amount - params.Amount
+	if stakeInfo.Amount == 0 {
+		chainIDBytes, err := utils.GetUint64Bytes(stakeInfo.ChainID)
+		if err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, getUint64Bytes error: %v", err)
+		}
+		pubkeyPrefix, err := hex.DecodeString(stakeInfo.Pubkey)
+		if err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, hex.DecodeString pubkey format error: %v", err)
+		}
+		native.CacheDB.Delete(utils.ConcatKey(utils.ChainManagerContractAddress, []byte(SIDE_CHAIN_STAKE_INFO), chainIDBytes, pubkeyPrefix))
+	} else {
+		err = putStakeInfo(native, stakeInfo)
+		if err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, putStakeInfo error: %v", err)
+		}
+	}
+
+	//transfer ong
+	err = appCallTransferOng(native, utils.ChainManagerContractAddress, address, params.Amount)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, ong transfer error: %v", err)
+	}
+	return utils.BYTE_TRUE, nil
+}
+
 func Inflation(native *native.NativeService) ([]byte, error) {
 	params := new(InflationParam)
 	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("inflation, contract params deserialize error: %v", err)
 	}
 
+	//get consensus multi sign address
+	address, err := getConsensusMultiAddress(native, params.ChainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("inflation, getConsensusMultiAddress error: %v", err)
+	}
+
 	//check witness
-	err := utils.ValidateOwner(native, params.Address)
+	err = utils.ValidateOwner(native, address)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("inflation, validateOwner error: %v", err)
 	}
@@ -437,19 +531,10 @@ func Inflation(native *native.NativeService) ([]byte, error) {
 	if sideChain.Status != SideChainStatus {
 		return utils.BYTE_FALSE, fmt.Errorf("inflation, side chain status is not normal status")
 	}
-	if sideChain.Address != params.Address {
-		return utils.BYTE_FALSE, fmt.Errorf("inflation, address is not side chain admin")
-	}
 
 	err = putInflationInfo(native, params)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("inflation, put inflationInfo error: %v", err)
-	}
-
-	//ong transfer
-	err = appCallTransferOng(native, params.Address, utils.ChainManagerContractAddress, params.DepositAdd)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("inflation, ong transfer error: %v", err)
 	}
 	return utils.BYTE_TRUE, nil
 }
@@ -514,106 +599,42 @@ func RejectInflation(native *native.NativeService) ([]byte, error) {
 	}
 	contract := native.ContextRef.CurrentContext().ContractAddress
 
-	//get inflation info
-	inflationInfo, err := getInflationInfo(native, params.ChainID)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("rejectInflation, get inflationInfo error: %v", err)
-	}
 	chainIDBytes, err := utils.GetUint64Bytes(params.ChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("rejectInflation, getUint64Bytes error: %v", err)
 	}
 	native.CacheDB.Delete(utils.ConcatKey(contract, []byte(INFLATION_INFO), chainIDBytes))
-
-	//ong transfer
-	err = appCallTransferOng(native, utils.ChainManagerContractAddress, inflationInfo.Address, inflationInfo.DepositAdd)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("rejectInflation, ong transfer error: %v", err)
-	}
 	return utils.BYTE_TRUE, nil
 }
 
-func RegisterNodeToSideChain(native *native.NativeService) ([]byte, error) {
-	params := new(NodeToSideChainParams)
-	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, contract params deserialize error: %v", err)
-	}
-
-	//check witness
-	err := utils.ValidateOwner(native, params.Address)
+func IfStaked(native *native.NativeService) ([]byte, error) {
+	header, err := types.HeaderFromRawBytes(native.Input)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, validateOwner error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, types.HeaderFromRawBytes error: %s", err)
+	}
+	blkInfo := &vconfig.VbftBlockInfo{}
+	if err := json.Unmarshal(header.ConsensusPayload, blkInfo); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, unmarshal blockInfo error: %s", err)
+	}
+	if blkInfo.NewChainConfig == nil {
+		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, blkInfo.NewChainConfig is nil")
+	}
+	var stakeSum uint64
+	for _, p := range blkInfo.NewChainConfig.Peers {
+		stakeInfo, err := GetStakeInfo(native, header.ShardID, p.ID)
+		if err != nil {
+			return utils.BYTE_FALSE, fmt.Errorf("IfStaked, GetStakeInfo error: %s", err)
+		}
+		stakeSum = stakeSum + stakeInfo.Amount
 	}
 
-	//check if side chain exist
-	_, err = GetSideChain(native, params.ChainID)
+	//get side chain info
+	sideChain, err := GetSideChain(native, header.ShardID)
 	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, get sideChain error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, GetSideChain error: %s", err)
 	}
-
-	//get current view
-	view, err := governance.GetView(native, utils.GovernanceContractAddress)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, get view error: %v", err)
-	}
-
-	//get peerPoolMap
-	peerPoolMap, err := governance.GetPeerPoolMap(native, utils.GovernanceContractAddress, view)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, get peerPoolMap error: %v", err)
-	}
-
-	peerPoolItem, ok := peerPoolMap.PeerPoolMap[params.PeerPubkey]
-	if !ok {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, node is not registered in peer pool map")
-	}
-	if peerPoolItem.Address != params.Address {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, address is not node owner")
-	}
-
-	//get side chain node info
-	sideChainNodeInfo, err := getSideChainNodeInfo(native, params.ChainID)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, get sideChainNodeInfo error: %v", err)
-	}
-	sideChainNodeInfo.NodeInfoMap[params.PeerPubkey] = params
-
-	err = putSideChainNodeInfo(native, sideChainNodeInfo)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("registerNodeToSideChain, put sideChainNodeInfo error: %v", err)
-	}
-	return utils.BYTE_TRUE, nil
-}
-
-func QuitNodeToSideChain(native *native.NativeService) ([]byte, error) {
-	params := new(NodeToSideChainParams)
-	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, contract params deserialize error: %v", err)
-	}
-
-	//check witness
-	err := utils.ValidateOwner(native, params.Address)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, validateOwner error: %v", err)
-	}
-
-	//get side chain node info
-	sideChainNodeInfo, err := getSideChainNodeInfo(native, params.ChainID)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, get sideChainNodeInfo error: %v", err)
-	}
-	_, ok := sideChainNodeInfo.NodeInfoMap[params.PeerPubkey]
-	if !ok {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, node is not registered")
-	}
-	if sideChainNodeInfo.NodeInfoMap[params.PeerPubkey].Address != params.Address {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, address is not node owner")
-	}
-	delete(sideChainNodeInfo.NodeInfoMap, params.PeerPubkey)
-
-	err = putSideChainNodeInfo(native, sideChainNodeInfo)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("quitNodeToSideChain, put sideChainNodeInfo error: %v", err)
+	if stakeSum < sideChain.Deposit {
+		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, stake of consensus peer is not enough")
 	}
 	return utils.BYTE_TRUE, nil
 }

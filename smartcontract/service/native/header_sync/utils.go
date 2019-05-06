@@ -123,10 +123,11 @@ func verifyHeader(native *native.NativeService, header *types.Header) error {
 	if err != nil {
 		return fmt.Errorf("verifyHeader, findKeyHeight error:%v", err)
 	}
-	consensusPeer, err := getConsensusPeer(native, header.ShardID, keyHeight)
+	consensusPeer, err := getConsensusPeersByHeight(native, header.ShardID, keyHeight)
 	if err != nil {
 		return fmt.Errorf("verifyHeader, get ConsensusPeer error:%v", err)
 	}
+	//TODO
 	//if len(header.Bookkeepers)*3 < len(consensusPeer.PeerMap)*2 {
 	//	return fmt.Errorf("verifyHeader, header Bookkeepers num %d must more than 2/3 consensus node num %d", len(header.Bookkeepers), len(consensusPeer.PeerMap))
 	//}
@@ -183,11 +184,24 @@ func putKeyHeights(native *native.NativeService, chainID uint64, keyHeights *Key
 	return nil
 }
 
-func getConsensusPeer(native *native.NativeService, chainID uint64, height uint32) (*ConsensusPeer, error) {
+func GetConsensusPeers(native *native.NativeService, chainID uint64) (*ConsensusPeers, error) {
+	keyHeights, err := GetKeyHeights(native, chainID)
+	if err != nil {
+		return nil, fmt.Errorf("getConsensusPeer, GetKeyHeights error: %v", err)
+	}
+	height := keyHeights.HeightList[len(keyHeights.HeightList)-1]
+	consensusPeer, err := getConsensusPeersByHeight(native, chainID, height)
+	if err != nil {
+		return nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight error: %v", err)
+	}
+	return consensusPeer, nil
+}
+
+func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, height uint32) (*ConsensusPeers, error) {
 	contract := utils.HeaderSyncContractAddress
 	heightBytes, err := utils.GetUint32Bytes(height)
 	if err != nil {
-		return nil, fmt.Errorf("putConsensusPeer, getUint32Bytes error: %v", err)
+		return nil, fmt.Errorf("getConsensusPeerByHeight, getUint32Bytes error: %v", err)
 	}
 	chainIDBytes, err := utils.GetUint64Bytes(chainID)
 	if err != nil {
@@ -195,23 +209,23 @@ func getConsensusPeer(native *native.NativeService, chainID uint64, height uint3
 	}
 	consensusPeerStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(CONSENSUS_PEER), chainIDBytes, heightBytes))
 	if err != nil {
-		return nil, fmt.Errorf("get consensusPeerStore error: %v", err)
+		return nil, fmt.Errorf("getConsensusPeerByHeight, get consensusPeerStore error: %v", err)
 	}
-	consensusPeer := new(ConsensusPeer)
+	consensusPeer := new(ConsensusPeers)
 	if consensusPeerStore == nil {
-		return nil, fmt.Errorf("getConsensusPeer, can not find any record")
+		return nil, fmt.Errorf("getConsensusPeerByHeight, can not find any record")
 	}
 	consensusPeerBytes, err := cstates.GetValueFromRawStorageItem(consensusPeerStore)
 	if err != nil {
-		return nil, fmt.Errorf("getConsensusPeer, deserialize from raw storage item err:%v", err)
+		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize from raw storage item err:%v", err)
 	}
 	if err := consensusPeer.Deserialize(bytes.NewBuffer(consensusPeerBytes)); err != nil {
-		return nil, fmt.Errorf("getConsensusPeer, deserialize consensusPeer error: %v", err)
+		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize consensusPeer error: %v", err)
 	}
 	return consensusPeer, nil
 }
 
-func putConsensusPeer(native *native.NativeService, chainID uint64, height uint32, consensusPeer *ConsensusPeer) error {
+func putConsensusPeer(native *native.NativeService, chainID uint64, height uint32, consensusPeer *ConsensusPeers) error {
 	contract := utils.HeaderSyncContractAddress
 	bf := new(bytes.Buffer)
 	if err := consensusPeer.Serialize(bf); err != nil {
@@ -246,7 +260,11 @@ func UpdateConsensusPeer(native *native.NativeService, header *types.Header, add
 		return fmt.Errorf("updateConsensusPeer, unmarshal blockInfo error: %s", err)
 	}
 	if blkInfo.NewChainConfig != nil {
-		consensusPeer := &ConsensusPeer{
+		if _, err := native.NativeCall(utils.ChainManagerContractAddress, "ifStaked", header.ToArray()); err != nil {
+			return fmt.Errorf("UpdateConsensusPeer, appCall ifStaked error: %v", err)
+		}
+
+		consensusPeer := &ConsensusPeers{
 			PeerMap: make(map[string]*Peer),
 		}
 		for _, p := range blkInfo.NewChainConfig.Peers {

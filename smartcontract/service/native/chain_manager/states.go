@@ -44,19 +44,17 @@ func (this *Status) Deserialization(source *common.ZeroCopySource) error {
 }
 
 type SideChain struct {
-	ChainID            uint64         //side chain id
-	Address            common.Address //side chain admin
-	Ratio              uint64         //side chain ong ratio(ong:ongx)
-	Deposit            uint64         //side chain deposit
-	OngNum             uint64         //side chain ong num
-	OngPool            uint64         //side chain ong pool limit
-	Status             Status         //side chain status
-	GenesisBlockHeader []byte         //side chain genesis block
+	ChainID            uint64 //side chain id
+	Ratio              uint64 //side chain ong ratio(ong:ongx)
+	Deposit            uint64 //side chain deposit
+	OngNum             uint64 //side chain ong num
+	OngPool            uint64 //side chain ong pool limit
+	Status             Status //side chain status
+	GenesisBlockHeader []byte //side chain genesis block
 }
 
 func (this *SideChain) Serialize(sink *common.ZeroCopySink) {
 	sink.WriteUint64(this.ChainID)
-	sink.WriteAddress(this.Address)
 	sink.WriteUint64(this.Ratio)
 	sink.WriteUint64(this.Deposit)
 	sink.WriteUint64(this.OngNum)
@@ -69,10 +67,6 @@ func (this *SideChain) Deserialize(source *common.ZeroCopySource) error {
 	chainID, eof := source.NextUint64()
 	if eof {
 		return fmt.Errorf("source.NextString, deserialize chainID error: %v", io.ErrUnexpectedEOF)
-	}
-	address, eof := source.NextAddress()
-	if eof {
-		return fmt.Errorf("source.NextAddress, deserialize address error: %v", io.ErrUnexpectedEOF)
 	}
 	ratio, eof := source.NextUint64()
 	if eof {
@@ -103,7 +97,6 @@ func (this *SideChain) Deserialize(source *common.ZeroCopySource) error {
 		return fmt.Errorf("source.NextVarBytes, deserialize genesisBlockHeader error: %v", io.ErrUnexpectedEOF)
 	}
 	this.ChainID = chainID
-	this.Address = address
 	this.Ratio = ratio
 	this.Deposit = deposit
 	this.OngNum = ongNum
