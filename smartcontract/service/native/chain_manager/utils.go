@@ -220,7 +220,7 @@ func putStakeInfo(native *native.NativeService, stakeInfo *StakeSideChainParam) 
 	contract := utils.ChainManagerContractAddress
 	sink := common.NewZeroCopySink(nil)
 	if err := stakeInfo.Serialization(sink); err != nil {
-		return fmt.Errorf("serialize, serialize inflationInfo error: %v", err)
+		return fmt.Errorf("serialize, serialize stakeInfo error: %v", err)
 	}
 	chainIDBytes, err := utils.GetUint64Bytes(stakeInfo.ChainID)
 	if err != nil {
@@ -283,5 +283,44 @@ func appCallTransfer(native *native.NativeService, contract common.Address, from
 	if _, err := native.NativeCall(contract, "transfer", sink.Bytes()); err != nil {
 		return fmt.Errorf("appCallTransfer, appCall error: %v", err)
 	}
+	return nil
+}
+
+func GetGovernanceEpoch(native *native.NativeService, chainID uint64) (*GovernanceEpoch, error) {
+	contract := utils.ChainManagerContractAddress
+	chainIDBytes, err := utils.GetUint64Bytes(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("getUint64Bytes error: %v", err)
+	}
+	governanceEpochStore, err := native.CacheDB.Get(utils.ConcatKey(contract, []byte(GOVERNANCE_EPOCH), chainIDBytes))
+	if err != nil {
+		return nil, fmt.Errorf("get governanceEpochStore error: %v", err)
+	}
+	governanceEpoch := new(GovernanceEpoch)
+	if governanceEpochStore != nil {
+		stakeInfoBytes, err := cstates.GetValueFromRawStorageItem(governanceEpochStore)
+		if err != nil {
+			return nil, fmt.Errorf("GetGovernanceEpoch, deserialize from raw storage item err:%v", err)
+		}
+		if err := governanceEpoch.Deserialization(common.NewZeroCopySource(stakeInfoBytes)); err != nil {
+			return nil, fmt.Errorf("deserialize, deserialize governanceEpoch error: %v", err)
+		}
+	}
+	return governanceEpoch, nil
+}
+
+func putGovernanceEpoch(native *native.NativeService, governanceEpoch *GovernanceEpoch) error {
+	contract := utils.ChainManagerContractAddress
+	sink := common.NewZeroCopySink(nil)
+	if err := governanceEpoch.Serialization(sink); err != nil {
+		return fmt.Errorf("serialize, serialize governanceEpoch error: %v", err)
+	}
+	chainIDBytes, err := utils.GetUint64Bytes(governanceEpoch.ChainID)
+	if err != nil {
+		return fmt.Errorf("getUint64Bytes error: %v", err)
+	}
+
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(GOVERNANCE_EPOCH), chainIDBytes),
+		cstates.GenRawStorageItem(sink.Bytes()))
 	return nil
 }

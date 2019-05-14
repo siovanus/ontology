@@ -116,6 +116,8 @@ func GetHeaderByHash(native *native.NativeService, chainID uint64, hash common.U
 	return header, nil
 }
 
+//verify header of any height
+//find key height and get consensus peer first, then check the sign
 func verifyHeader(native *native.NativeService, header *types.Header) error {
 	height := header.Height
 	//search consensus peer
@@ -123,6 +125,21 @@ func verifyHeader(native *native.NativeService, header *types.Header) error {
 	if err != nil {
 		return fmt.Errorf("verifyHeader, findKeyHeight error:%v", err)
 	}
+
+	//check epoch
+	chainIBytes, err := utils.GetUint64Bytes(header.ShardID)
+	if err != nil {
+		return fmt.Errorf("verifyHeader, utils.GetUint64Bytes error:%v", err)
+	}
+	r, err := native.NativeCall(utils.ChainManagerContractAddress, "getEpoch", chainIBytes)
+	if err != nil {
+		return fmt.Errorf("verifyHeader, appCall getEpoch error: %v", err)
+	}
+	epoch, err := utils.GetBytesUint32(r.([]byte))
+	if header.Height > epoch+keyHeight {
+		return fmt.Errorf("verifyHeader, height gap is more than epoch")
+	}
+
 	consensusPeer, err := getConsensusPeersByHeight(native, header.ShardID, keyHeight)
 	if err != nil {
 		return fmt.Errorf("verifyHeader, get ConsensusPeer error:%v", err)
@@ -195,6 +212,24 @@ func GetConsensusPeers(native *native.NativeService, chainID uint64) (*Consensus
 		return nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight error: %v", err)
 	}
 	return consensusPeer, nil
+}
+
+func GetRecent2ConsensusPeers(native *native.NativeService, chainID uint64) (*ConsensusPeers, *ConsensusPeers, error) {
+	keyHeights, err := GetKeyHeights(native, chainID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getConsensusPeer, GetKeyHeights error: %v", err)
+	}
+	height1 := keyHeights.HeightList[len(keyHeights.HeightList)-1]
+	height2 := keyHeights.HeightList[len(keyHeights.HeightList)-2]
+	consensusPeer1, err := getConsensusPeersByHeight(native, chainID, height1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight 1 error: %v", err)
+	}
+	consensusPeer2, err := getConsensusPeersByHeight(native, chainID, height2)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight 2 error: %v", err)
+	}
+	return consensusPeer1, consensusPeer2, nil
 }
 
 func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, height uint32) (*ConsensusPeers, error) {

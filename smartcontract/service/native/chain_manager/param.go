@@ -259,3 +259,34 @@ func (this *StakeSideChainParam) Deserialization(source *common.ZeroCopySource) 
 	this.Amount = amount
 	return nil
 }
+
+type GovernanceEpoch struct {
+	ChainID uint64
+	Epoch   uint32
+}
+
+func (this *GovernanceEpoch) Serialization(sink *common.ZeroCopySink) error {
+	utils.EncodeVarUint(sink, this.ChainID)
+	if this.Epoch > math.MaxUint32 {
+		return fmt.Errorf("serialize GovernanceEpoch error: Epoch more than MaxUint32")
+	}
+	utils.EncodeVarUint(sink, uint64(this.Epoch))
+	return nil
+}
+
+func (this *GovernanceEpoch) Deserialization(source *common.ZeroCopySource) error {
+	chainID, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
+	}
+	epoch, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize epoch error: %v", err)
+	}
+	if epoch > math.MaxUint32 {
+		return fmt.Errorf("deserialize GovernanceEpoch error: Epoch more than MaxUint32")
+	}
+	this.ChainID = chainID
+	this.Epoch = uint32(epoch)
+	return nil
+}

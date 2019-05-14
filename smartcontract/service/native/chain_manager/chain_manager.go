@@ -48,6 +48,7 @@ const (
 	INIT_CONFIG             = "initConfig"
 	REGISTER_MAIN_CHAIN     = "registerMainChain"
 	REGISTER_SIDE_CHAIN     = "registerSideChain"
+	SET_GOVERNANCE_EPOCH    = "setGovernanceEpoch"
 	APPROVE_SIDE_CHAIN      = "approveSideChain"
 	REJECT_SIDE_CHAIN       = "rejectSideChain"
 	QUIT_SIDE_CHAIN         = "quitSideChain"
@@ -59,12 +60,14 @@ const (
 	APPROVE_INFLATION       = "approveInflation"
 	REJECT_INFLATION        = "rejectInflation"
 	IF_STAKED               = "ifStaked"
+	GET_EPOCH               = "getEpoch"
 
 	//key prefix
 	MAIN_CHAIN            = "mainChain"
 	SIDE_CHAIN            = "sideChain"
 	INFLATION_INFO        = "inflationInfo"
 	SIDE_CHAIN_STAKE_INFO = "sideChainStakeInfo"
+	GOVERNANCE_EPOCH      = "governanceEpoch"
 )
 
 //Init governance contract address
@@ -77,6 +80,7 @@ func RegisterChainManagerContract(native *native.NativeService) {
 	native.Register(INIT_CONFIG, InitConfig)
 	native.Register(REGISTER_MAIN_CHAIN, RegisterMainChain)
 	native.Register(REGISTER_SIDE_CHAIN, RegisterSideChain)
+	native.Register(SET_GOVERNANCE_EPOCH, SetGovernanceEpoch)
 	native.Register(APPROVE_SIDE_CHAIN, ApproveSideChain)
 	native.Register(REJECT_SIDE_CHAIN, RejectSideChain)
 	native.Register(QUIT_SIDE_CHAIN, QuitSideChain)
@@ -89,6 +93,7 @@ func RegisterChainManagerContract(native *native.NativeService) {
 	native.Register(REJECT_INFLATION, RejectInflation)
 
 	native.Register(IF_STAKED, IfStaked)
+	native.Register(GET_EPOCH, GetEpoch)
 }
 
 func InitConfig(native *native.NativeService) ([]byte, error) {
@@ -197,6 +202,31 @@ func RegisterSideChain(native *native.NativeService) ([]byte, error) {
 	err = putSideChain(native, sideChain)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("RegisterSideChain, put sideChain error: %v", err)
+	}
+	return utils.BYTE_TRUE, nil
+}
+
+func SetGovernanceEpoch(native *native.NativeService) ([]byte, error) {
+	params := new(GovernanceEpoch)
+	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SetGovernanceEpoch, contract params deserialize error: %v", err)
+	}
+
+	//get consensus multi sign address
+	address, err := getConsensusMultiAddress(native, params.ChainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SetGovernanceEpoch, getConsensusMultiAddress error: %v", err)
+	}
+
+	//check witness
+	err = utils.ValidateOwner(native, address)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SetGovernanceEpoch, checkWitness error: %v", err)
+	}
+
+	err = putGovernanceEpoch(native, params)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SetGovernanceEpoch, putGovernanceEpoch error: %v", err)
 	}
 	return utils.BYTE_TRUE, nil
 }
@@ -460,13 +490,17 @@ func UnStakeSideChain(native *native.NativeService) ([]byte, error) {
 	}
 
 	//check if consensus peer
-	consensusPeer, err := header_sync.GetConsensusPeers(native, params.ChainID)
+	consensusPeer1, consensusPeer2, err := header_sync.GetRecent2ConsensusPeers(native, params.ChainID)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, header_sync.GetConsensusPeers error: %v", err)
 	}
-	_, ok := consensusPeer.PeerMap[params.Pubkey]
+	_, ok := consensusPeer1.PeerMap[params.Pubkey]
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, peer is consensus peer now, can not unstake")
+	}
+	_, ok = consensusPeer2.PeerMap[params.Pubkey]
+	if ok {
+		return utils.BYTE_FALSE, fmt.Errorf("UnStakeSideChain, peer is consensus peer previous epoch, can not unstake")
 	}
 
 	//update stake info
@@ -637,4 +671,20 @@ func IfStaked(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("IfStaked, stake of consensus peer is not enough")
 	}
 	return utils.BYTE_TRUE, nil
+}
+
+func GetEpoch(native *native.NativeService) ([]byte, error) {
+	chainID, err := utils.GetBytesUint64(native.Input)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("GetEpoch, utils.GetBytesUint64 error: %s", err)
+	}
+	governanceEpoch, err := GetGovernanceEpoch(native, chainID)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("GetEpoch, GetGovernanceEpoch error: %s", err)
+	}
+	r, err := utils.GetUint32Bytes(governanceEpoch.Epoch)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("GetEpoch, utils.GetUint64Bytes error: %s", err)
+	}
+	return r, nil
 }
