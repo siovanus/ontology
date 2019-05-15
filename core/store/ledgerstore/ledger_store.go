@@ -1073,6 +1073,7 @@ func (this *LedgerStoreImp) PreExecuteContract(tx *types.Transaction) (*sstate.P
 			CacheDB: cache,
 			Gas:     math.MaxUint64 - calcGasByCodeLen(len(invoke.Code), preGas[neovm.UINT_INVOKE_CODE_LEN_NAME]),
 			PreExec: true,
+			CrossHashes: common.NewZeroCopySink(nil),
 		}
 
 		//start the smart contract executive function
