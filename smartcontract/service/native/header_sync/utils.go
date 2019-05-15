@@ -272,9 +272,16 @@ func putConsensusPeer(native *native.NativeService, chainID uint64, height uint3
 	}
 	heightBytes, err := utils.GetUint32Bytes(height)
 	if err != nil {
-		return fmt.Errorf("putConsensusPeer, getUint32Bytes error: %v", err)
+		return fmt.Errorf("putConsensusPeer, getUint32Bytes 1 error: %v", err)
+	}
+	blockHeightBytes, err := utils.GetUint32Bytes(native.Height)
+	if err != nil {
+		return fmt.Errorf("putConsensusPeer, getUint32Bytes 2 error: %v", err)
 	}
 	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CONSENSUS_PEER), chainIDBytes, heightBytes), cstates.GenRawStorageItem(bf.Bytes()))
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CONSENSUS_PEER_BLOCK_HEIGHT), chainIDBytes, heightBytes),
+		cstates.GenRawStorageItem(blockHeightBytes))
+	native.ContextRef.PutMerkleVal(bf.Bytes())
 
 	//update key heights
 	keyHeights, err := GetKeyHeights(native, chainID)

@@ -29,15 +29,17 @@ import (
 
 const (
 	//function name
-	SYNC_BLOCK_HEADER = "syncBlockHeader"
+	SYNC_BLOCK_HEADER   = "syncBlockHeader"
+	SYNC_CONSENSUS_PEER = "syncConsensusPeer"
 
 	//key prefix
-	BLOCK_HEADER   = "blockHeader"
-	CURRENT_HEIGHT = "currentHeight"
-	HEADER_INDEX   = "headerIndex"
-	CONSENSUS_PEER = "consensusPeer"
-	KEY_HEIGHTS    = "keyHeights"
-	SYNC_ADDRESS   = "syncAddress"
+	BLOCK_HEADER                = "blockHeader"
+	CURRENT_HEIGHT              = "currentHeight"
+	HEADER_INDEX                = "headerIndex"
+	CONSENSUS_PEER              = "consensusPeer"
+	CONSENSUS_PEER_BLOCK_HEIGHT = "consensusPeerBlockHeight"
+	KEY_HEIGHTS                 = "keyHeights"
+	SYNC_ADDRESS                = "syncAddress"
 )
 
 //Init governance contract address
@@ -48,6 +50,7 @@ func InitHeaderSync() {
 //Register methods of governance contract
 func RegisterHeaderSyncContract(native *native.NativeService) {
 	native.Register(SYNC_BLOCK_HEADER, SyncBlockHeader)
+	native.Register(SYNC_CONSENSUS_PEER, SyncConsensusPeer)
 }
 
 func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
@@ -76,6 +79,14 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, update ConsensusPeer error: %v", err)
 		}
+	}
+	return utils.BYTE_TRUE, nil
+}
+
+func SyncConsensusPeer(native *native.NativeService) ([]byte, error) {
+	params := new(SyncConsensusPeerParam)
+	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, contract params deserialize error: %v", err)
 	}
 	return utils.BYTE_TRUE, nil
 }

@@ -58,3 +58,27 @@ func (this *SyncBlockHeaderParam) Deserialization(source *common.ZeroCopySource)
 	this.Headers = headers
 	return nil
 }
+
+type SyncConsensusPeerParam struct {
+	Header []byte
+	Proof  string
+}
+
+func (this *SyncConsensusPeerParam) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeVarBytes(sink, this.Header)
+	utils.EncodeString(sink, this.Proof)
+}
+
+func (this *SyncConsensusPeerParam) Deserialization(source *common.ZeroCopySource) error {
+	header, err := utils.DecodeVarBytes(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarBytes, deserialize header error:%s", err)
+	}
+	proof, err := utils.DecodeString(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeString, deserialize proof count error:%s", err)
+	}
+	this.Header = header
+	this.Proof = proof
+	return nil
+}
