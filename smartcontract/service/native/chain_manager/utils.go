@@ -296,7 +296,10 @@ func GetGovernanceEpoch(native *native.NativeService, chainID uint64) (*Governan
 	if err != nil {
 		return nil, fmt.Errorf("get governanceEpochStore error: %v", err)
 	}
-	governanceEpoch := new(GovernanceEpoch)
+	governanceEpoch := &GovernanceEpoch{
+		ChainID: chainID,
+		Epoch:   120000,
+	}
 	if governanceEpochStore != nil {
 		stakeInfoBytes, err := cstates.GetValueFromRawStorageItem(governanceEpochStore)
 		if err != nil {
