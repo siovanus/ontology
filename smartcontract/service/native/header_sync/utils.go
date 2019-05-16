@@ -302,8 +302,10 @@ func UpdateConsensusPeer(native *native.NativeService, header *types.Header, add
 		return fmt.Errorf("updateConsensusPeer, unmarshal blockInfo error: %s", err)
 	}
 	if blkInfo.NewChainConfig != nil {
-		if _, err := native.NativeCall(utils.ChainManagerContractAddress, "ifStaked", header.ToArray()); err != nil {
-			return fmt.Errorf("UpdateConsensusPeer, appCall ifStaked error: %v", err)
+		if header.ShardID != 0 {
+			if _, err := native.NativeCall(utils.ChainManagerContractAddress, "ifStaked", header.ToArray()); err != nil {
+				return fmt.Errorf("UpdateConsensusPeer, appCall ifStaked error: %v", err)
+			}
 		}
 
 		consensusPeer := &ConsensusPeers{
