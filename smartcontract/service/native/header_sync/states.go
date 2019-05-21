@@ -20,11 +20,9 @@ package header_sync
 
 import (
 	"fmt"
-	"io"
-
 	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/common/serialization"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
+	"math"
 	"sort"
 )
 
@@ -33,26 +31,24 @@ type Peer struct {
 	PeerPubkey string
 }
 
-func (this *Peer) Serialize(w io.Writer) error {
-	if err := serialization.WriteUint32(w, this.Index); err != nil {
-		return fmt.Errorf("serialization.WriteUint32, serialize index error: %v", err)
-	}
-	if err := serialization.WriteString(w, this.PeerPubkey); err != nil {
-		return fmt.Errorf("serialization.WriteString, serialize peerPubkey error: %v", err)
-	}
-	return nil
+func (this *Peer) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeVarUint(sink, uint64(this.Index))
+	utils.EncodeString(sink, this.PeerPubkey)
 }
 
-func (this *Peer) Deserialize(r io.Reader) error {
-	index, err := serialization.ReadUint32(r)
+func (this *Peer) Deserialization(source *common.ZeroCopySource) error {
+	index, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadUint32, deserialize index error: %v", err)
+		return fmt.Errorf("utils.DecodeVarUint, deserialize index error: %v", err)
 	}
-	peerPubkey, err := serialization.ReadString(r)
+	if index > math.MaxUint32 {
+		return fmt.Errorf("deserialize index error: index more than max uint32")
+	}
+	peerPubkey, err := utils.DecodeString(source)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadString, deserialize peerPubkey error: %v", err)
+		return fmt.Errorf("utils.DecodeString, deserialize peerPubkey error: %v", err)
 	}
-	this.Index = index
+	this.Index = uint32(index)
 	this.PeerPubkey = peerPubkey
 	return nil
 }
@@ -93,10 +89,8 @@ type ConsensusPeers struct {
 	PeerMap map[string]*Peer
 }
 
-func (this *ConsensusPeers) Serialize(w io.Writer) error {
-	if err := serialization.WriteUint32(w, uint32(len(this.PeerMap))); err != nil {
-		return fmt.Errorf("serialization.WriteUint32, serialize PeerMap length error: %v", err)
-	}
+func (this *ConsensusPeers) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeVarUint(sink, uint64(len(this.PeerMap)))
 	var peerList []*Peer
 	for _, v := range this.PeerMap {
 		peerList = append(peerList, v)
@@ -105,22 +99,19 @@ func (this *ConsensusPeers) Serialize(w io.Writer) error {
 		return peerList[i].PeerPubkey > peerList[j].PeerPubkey
 	})
 	for _, v := range peerList {
-		if err := v.Serialize(w); err != nil {
-			return fmt.Errorf("serialize peer error: %v", err)
-		}
+		v.Serialization(sink)
 	}
-	return nil
 }
 
-func (this *ConsensusPeers) Deserialize(r io.Reader) error {
-	n, err := serialization.ReadUint32(r)
+func (this *ConsensusPeers) Deserialization(source *common.ZeroCopySource) error {
+	n, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("serialization.ReadUint32, deserialize PeerMap length error: %v", err)
+		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error: %v", err)
 	}
 	peerMap := make(map[string]*Peer)
-	for i := 0; uint32(i) < n; i++ {
+	for i := 0; uint64(i) < n; i++ {
 		peer := new(Peer)
-		if err := peer.Deserialize(r); err != nil {
+		if err := peer.Deserialization(source); err != nil {
 			return fmt.Errorf("deserialize peer error: %v", err)
 		}
 		peerMap[peer.PeerPubkey] = peer

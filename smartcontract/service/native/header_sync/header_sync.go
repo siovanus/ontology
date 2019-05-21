@@ -21,16 +21,18 @@ package header_sync
 import (
 	"fmt"
 
+	"encoding/hex"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/core/types"
+	"github.com/ontio/ontology/merkle"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
 const (
 	//function name
-	SYNC_BLOCK_HEADER   = "syncBlockHeader"
-	SYNC_CONSENSUS_PEER = "syncConsensusPeer"
+	SYNC_BLOCK_HEADER    = "syncBlockHeader"
+	SYNC_CONSENSUS_PEERS = "syncConsensusPeers"
 
 	//key prefix
 	BLOCK_HEADER                = "blockHeader"
@@ -50,7 +52,7 @@ func InitHeaderSync() {
 //Register methods of governance contract
 func RegisterHeaderSyncContract(native *native.NativeService) {
 	native.Register(SYNC_BLOCK_HEADER, SyncBlockHeader)
-	native.Register(SYNC_CONSENSUS_PEER, SyncConsensusPeer)
+	native.Register(SYNC_CONSENSUS_PEERS, SyncConsensusPeers)
 }
 
 func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
@@ -83,10 +85,41 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 	return utils.BYTE_TRUE, nil
 }
 
-func SyncConsensusPeer(native *native.NativeService) ([]byte, error) {
+func SyncConsensusPeers(native *native.NativeService) ([]byte, error) {
 	params := new(SyncConsensusPeerParam)
 	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, contract params deserialize error: %v", err)
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, contract params deserialize error: %v", err)
 	}
+
+	header, err := types.HeaderFromRawBytes(params.Header)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, types.HeaderFromRawBytes error: %v", err)
+	}
+	consensusPeers, err := getConsensusPeersByHeight(native, header.ShardID, header.Height)
+	if consensusPeers != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, consensusPeers are already synced")
+	}
+	err = verifyHeader(native, header)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, verifyHeader error: %v", err)
+	}
+
+	path, err := hex.DecodeString(params.Proof)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, proof hex.DecodeString error: %v", err)
+	}
+	v := merkle.MerkleProve(path, header.CrossStatesRoot)
+	if v == nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, merkle.MerkleProve verify merkle proof error")
+	}
+	s := common.NewZeroCopySource(v)
+	if err := consensusPeers.Deserialization(s); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, deserialize consensusPeers error:%s", err)
+	}
+	err = putConsensusPeers(native, header.ShardID, header.Height, consensusPeers)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, put ConsensusPeers eerror: %s", err)
+	}
+
 	return utils.BYTE_TRUE, nil
 }

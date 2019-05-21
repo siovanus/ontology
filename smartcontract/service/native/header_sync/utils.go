@@ -19,7 +19,6 @@
 package header_sync
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -254,18 +253,16 @@ func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, hei
 	if err != nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize from raw storage item err:%v", err)
 	}
-	if err := consensusPeer.Deserialize(bytes.NewBuffer(consensusPeerBytes)); err != nil {
+	if err := consensusPeer.Deserialization(common.NewZeroCopySource(consensusPeerBytes)); err != nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize consensusPeer error: %v", err)
 	}
 	return consensusPeer, nil
 }
 
-func putConsensusPeer(native *native.NativeService, chainID uint64, height uint32, consensusPeer *ConsensusPeers) error {
+func putConsensusPeers(native *native.NativeService, chainID uint64, height uint32, consensusPeers *ConsensusPeers) error {
 	contract := utils.HeaderSyncContractAddress
-	bf := new(bytes.Buffer)
-	if err := consensusPeer.Serialize(bf); err != nil {
-		return fmt.Errorf("putConsensusPeer, serialize consensusPeer error: %v", err)
-	}
+	sink := common.NewZeroCopySink(nil)
+	consensusPeers.Serialization(sink)
 	chainIDBytes, err := utils.GetUint64Bytes(chainID)
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, GetUint64Bytes error: %v", err)
@@ -278,10 +275,10 @@ func putConsensusPeer(native *native.NativeService, chainID uint64, height uint3
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, getUint32Bytes 2 error: %v", err)
 	}
-	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CONSENSUS_PEER), chainIDBytes, heightBytes), cstates.GenRawStorageItem(bf.Bytes()))
+	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CONSENSUS_PEER), chainIDBytes, heightBytes), cstates.GenRawStorageItem(sink.Bytes()))
 	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CONSENSUS_PEER_BLOCK_HEIGHT), chainIDBytes, heightBytes),
 		cstates.GenRawStorageItem(blockHeightBytes))
-	native.ContextRef.PutMerkleVal(bf.Bytes())
+	native.ContextRef.PutMerkleVal(sink.Bytes())
 
 	//update key heights
 	keyHeights, err := GetKeyHeights(native, chainID)
@@ -308,13 +305,13 @@ func UpdateConsensusPeer(native *native.NativeService, header *types.Header, add
 			}
 		}
 
-		consensusPeer := &ConsensusPeers{
+		consensusPeers := &ConsensusPeers{
 			PeerMap: make(map[string]*Peer),
 		}
 		for _, p := range blkInfo.NewChainConfig.Peers {
-			consensusPeer.PeerMap[p.ID] = &Peer{Index: p.Index, PeerPubkey: p.ID}
+			consensusPeers.PeerMap[p.ID] = &Peer{Index: p.Index, PeerPubkey: p.ID}
 		}
-		err := putConsensusPeer(native, header.ShardID, header.Height, consensusPeer)
+		err := putConsensusPeers(native, header.ShardID, header.Height, consensusPeers)
 		if err != nil {
 			return fmt.Errorf("updateConsensusPeer, put ConsensusPeer eerror: %s", err)
 		}

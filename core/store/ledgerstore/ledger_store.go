@@ -1068,11 +1068,11 @@ func (this *LedgerStoreImp) PreExecuteContract(tx *types.Transaction) (*sstate.P
 		invoke := tx.Payload.(*payload.InvokeCode)
 
 		sc := smartcontract.SmartContract{
-			Config:  config,
-			Store:   this,
-			CacheDB: cache,
-			Gas:     math.MaxUint64 - calcGasByCodeLen(len(invoke.Code), preGas[neovm.UINT_INVOKE_CODE_LEN_NAME]),
-			PreExec: true,
+			Config:      config,
+			Store:       this,
+			CacheDB:     cache,
+			Gas:         math.MaxUint64 - calcGasByCodeLen(len(invoke.Code), preGas[neovm.UINT_INVOKE_CODE_LEN_NAME]),
+			PreExec:     true,
 			CrossHashes: common.NewZeroCopySink(nil),
 		}
 
