@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"bufio"
-	"encoding/hex"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/common/config"
@@ -628,7 +627,18 @@ func (this *LedgerStoreImp) Snapshot(key []byte, view uint32) error {
 		if err != nil {
 			return fmt.Errorf("authorizeInfoStore is not available!:%v", err)
 		}
-		w.WriteString(hex.EncodeToString(authorizeInfoStore))
+		authorizeInfo := new(governance.AuthorizeInfo)
+		if err := authorizeInfo.Deserialize(bytes.NewBuffer(authorizeInfoStore)); err != nil {
+			return fmt.Errorf("deserialize, deserialize authorizeInfo error: %v", err)
+		}
+		peerPubkey := authorizeInfo.PeerPubkey
+		address := authorizeInfo.Address.ToBase58()
+		value := authorizeInfo.CandidatePos + authorizeInfo.ConsensusPos
+		w.WriteString(peerPubkey)
+		w.WriteString("\t")
+		w.WriteString(address)
+		w.WriteString("\t")
+		w.WriteString(strconv.Itoa(int(value)))
 		w.WriteString("\n")
 	}
 	w.Flush()
