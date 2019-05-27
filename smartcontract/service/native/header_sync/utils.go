@@ -176,14 +176,15 @@ func GetKeyHeights(native *native.NativeService, chainID uint64) (*KeyHeights, e
 		HeightList: make([]uint32, 0),
 	}
 	if value != nil {
-		keyHeightsBytes, err := cstates.GetValueFromRawStorageItem(value)
-		if err != nil {
-			return nil, fmt.Errorf("GetKeyHeights, deserialize from raw storage item err:%v", err)
-		}
-		err = keyHeights.Deserialization(common.NewZeroCopySource(keyHeightsBytes))
-		if err != nil {
-			return nil, fmt.Errorf("GetKeyHeights, deserialize keyHeights err:%v", err)
-		}
+		return nil, fmt.Errorf("GetKeyHeights, key heights is empty")
+	}
+	keyHeightsBytes, err := cstates.GetValueFromRawStorageItem(value)
+	if err != nil {
+		return nil, fmt.Errorf("GetKeyHeights, deserialize from raw storage item err:%v", err)
+	}
+	err = keyHeights.Deserialization(common.NewZeroCopySource(keyHeightsBytes))
+	if err != nil {
+		return nil, fmt.Errorf("GetKeyHeights, deserialize keyHeights err:%v", err)
 	}
 	return keyHeights, nil
 }
@@ -216,17 +217,20 @@ func GetConsensusPeers(native *native.NativeService, chainID uint64) (*Consensus
 func GetRecent2ConsensusPeers(native *native.NativeService, chainID uint64) (*ConsensusPeers, *ConsensusPeers, error) {
 	keyHeights, err := GetKeyHeights(native, chainID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getConsensusPeer, GetKeyHeights error: %v", err)
+		return nil, nil, fmt.Errorf("GetRecent2ConsensusPeers, GetKeyHeights error: %v", err)
+	}
+	if len(keyHeights.HeightList) < 2 {
+		return nil, nil, fmt.Errorf("GetRecent2ConsensusPeers, length of keyHeights less than 2")
 	}
 	height1 := keyHeights.HeightList[len(keyHeights.HeightList)-1]
 	height2 := keyHeights.HeightList[len(keyHeights.HeightList)-2]
 	consensusPeer1, err := getConsensusPeersByHeight(native, chainID, height1)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight 1 error: %v", err)
+		return nil, nil, fmt.Errorf("GetRecent2ConsensusPeers, getConsensusPeerByHeight 1 error: %v", err)
 	}
 	consensusPeer2, err := getConsensusPeersByHeight(native, chainID, height2)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getConsensusPeer, getConsensusPeerByHeight 2 error: %v", err)
+		return nil, nil, fmt.Errorf("GetRecent2ConsensusPeers, getConsensusPeerByHeight 2 error: %v", err)
 	}
 	return consensusPeer1, consensusPeer2, nil
 }

@@ -58,7 +58,7 @@ type KeyHeights struct {
 }
 
 func (this *KeyHeights) Serialization(sink *common.ZeroCopySink) {
-	//first sort the list  (small -> big)
+	//first sort the list  (big -> small)
 	sort.SliceStable(this.HeightList, func(i, j int) bool {
 		return this.HeightList[i] > this.HeightList[j]
 	})
