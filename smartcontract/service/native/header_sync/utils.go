@@ -175,7 +175,7 @@ func GetKeyHeights(native *native.NativeService, chainID uint64) (*KeyHeights, e
 	keyHeights := &KeyHeights{
 		HeightList: make([]uint32, 0),
 	}
-	if value != nil {
+	if value == nil {
 		return nil, fmt.Errorf("GetKeyHeights, key heights is empty")
 	}
 	keyHeightsBytes, err := cstates.GetValueFromRawStorageItem(value)
@@ -249,7 +249,9 @@ func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, hei
 	if err != nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, get consensusPeerStore error: %v", err)
 	}
-	consensusPeer := new(ConsensusPeers)
+	consensusPeers := &ConsensusPeers{
+		PeerMap: make(map[string]*Peer),
+	}
 	if consensusPeerStore == nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, can not find any record")
 	}
@@ -257,10 +259,10 @@ func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, hei
 	if err != nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize from raw storage item err:%v", err)
 	}
-	if err := consensusPeer.Deserialization(common.NewZeroCopySource(consensusPeerBytes)); err != nil {
+	if err := consensusPeers.Deserialization(common.NewZeroCopySource(consensusPeerBytes)); err != nil {
 		return nil, fmt.Errorf("getConsensusPeerByHeight, deserialize consensusPeer error: %v", err)
 	}
-	return consensusPeer, nil
+	return consensusPeers, nil
 }
 
 func putConsensusPeers(native *native.NativeService, chainID uint64, height uint32, consensusPeers *ConsensusPeers) error {
