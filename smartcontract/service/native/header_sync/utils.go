@@ -250,6 +250,7 @@ func getConsensusPeersByHeight(native *native.NativeService, chainID uint64, hei
 	}
 	consensusPeers := &ConsensusPeers{
 		ChainID: chainID,
+		Height:  height,
 		PeerMap: make(map[string]*Peer),
 	}
 	if consensusPeerStore == nil {
@@ -286,7 +287,7 @@ func checkIfConsensusPeersSynced(native *native.NativeService, chainID uint64, h
 	}
 }
 
-func putConsensusPeers(native *native.NativeService, height uint32, consensusPeers *ConsensusPeers) error {
+func putConsensusPeers(native *native.NativeService, consensusPeers *ConsensusPeers) error {
 	contract := utils.HeaderSyncContractAddress
 	sink := common.NewZeroCopySink(nil)
 	consensusPeers.Serialization(sink)
@@ -294,7 +295,7 @@ func putConsensusPeers(native *native.NativeService, height uint32, consensusPee
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, GetUint64Bytes error: %v", err)
 	}
-	heightBytes, err := utils.GetUint32Bytes(height)
+	heightBytes, err := utils.GetUint32Bytes(consensusPeers.Height)
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, getUint32Bytes 1 error: %v", err)
 	}
@@ -312,7 +313,7 @@ func putConsensusPeers(native *native.NativeService, height uint32, consensusPee
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, GetKeyHeights error: %v", err)
 	}
-	keyHeights.HeightList = append(keyHeights.HeightList, height)
+	keyHeights.HeightList = append(keyHeights.HeightList, consensusPeers.Height)
 	err = putKeyHeights(native, consensusPeers.ChainID, keyHeights)
 	if err != nil {
 		return fmt.Errorf("putConsensusPeer, putKeyHeights error: %v", err)
@@ -334,12 +335,13 @@ func UpdateConsensusPeer(native *native.NativeService, header *types.Header, add
 
 		consensusPeers := &ConsensusPeers{
 			ChainID: header.ShardID,
+			Height:  header.Height,
 			PeerMap: make(map[string]*Peer),
 		}
 		for _, p := range blkInfo.NewChainConfig.Peers {
 			consensusPeers.PeerMap[p.ID] = &Peer{Index: p.Index, PeerPubkey: p.ID}
 		}
-		err := putConsensusPeers(native, header.Height, consensusPeers)
+		err := putConsensusPeers(native, consensusPeers)
 		if err != nil {
 			return fmt.Errorf("updateConsensusPeer, put ConsensusPeer eerror: %s", err)
 		}

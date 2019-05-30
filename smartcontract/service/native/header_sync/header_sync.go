@@ -122,9 +122,13 @@ func SyncConsensusPeers(native *native.NativeService) ([]byte, error) {
 	if ok {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, consensusPeers are already synced")
 	}
-	err = putConsensusPeers(native, header.Height, consensusPeers)
+	err = putConsensusPeers(native, consensusPeers)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, put ConsensusPeers error: %s", err)
+	}
+	err = putSyncAddress(native, consensusPeers.ChainID, params.Address)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("updateConsensusPeer, put SyncAddress eerror: %s", err)
 	}
 
 	return utils.BYTE_TRUE, nil
