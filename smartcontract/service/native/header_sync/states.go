@@ -86,10 +86,12 @@ func (this *KeyHeights) Deserialization(source *common.ZeroCopySource) error {
 }
 
 type ConsensusPeers struct {
+	ChainID uint64
 	PeerMap map[string]*Peer
 }
 
 func (this *ConsensusPeers) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeVarUint(sink, this.ChainID)
 	utils.EncodeVarUint(sink, uint64(len(this.PeerMap)))
 	var peerList []*Peer
 	for _, v := range this.PeerMap {
@@ -104,6 +106,10 @@ func (this *ConsensusPeers) Serialization(sink *common.ZeroCopySink) {
 }
 
 func (this *ConsensusPeers) Deserialization(source *common.ZeroCopySource) error {
+	chainID, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
+	}
 	n, err := utils.DecodeVarUint(source)
 	if err != nil {
 		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error: %v", err)
@@ -116,6 +122,7 @@ func (this *ConsensusPeers) Deserialization(source *common.ZeroCopySource) error
 		}
 		peerMap[peer.PeerPubkey] = peer
 	}
+	this.ChainID = chainID
 	this.PeerMap = peerMap
 	return nil
 }
