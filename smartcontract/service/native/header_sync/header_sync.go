@@ -95,13 +95,6 @@ func SyncConsensusPeers(native *native.NativeService) ([]byte, error) {
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, types.HeaderFromRawBytes error: %v", err)
 	}
-	ok, err := checkIfConsensusPeersSynced(native, header.ShardID, header.Height)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, checkIfConsensusPeersSynced error: %v", err)
-	}
-	if ok {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, consensusPeers are already synced")
-	}
 	err = verifyHeader(native, header)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, verifyHeader error: %v", err)
@@ -121,6 +114,13 @@ func SyncConsensusPeers(native *native.NativeService) ([]byte, error) {
 	s := common.NewZeroCopySource(v)
 	if err := consensusPeers.Deserialization(s); err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, deserialize consensusPeers error:%s", err)
+	}
+	ok, err := checkIfConsensusPeersSynced(native, consensusPeers.ChainID, header.Height)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, checkIfConsensusPeersSynced error: %v", err)
+	}
+	if ok {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, consensusPeers are already synced")
 	}
 	err = putConsensusPeers(native, header.Height, consensusPeers)
 	if err != nil {
