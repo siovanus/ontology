@@ -27,6 +27,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,7 +52,6 @@ import (
 	"github.com/ontio/ontology/merkle"
 	"github.com/ontio/ontology/smartcontract"
 	"github.com/ontio/ontology/smartcontract/event"
-	"github.com/ontio/ontology/smartcontract/service/native/global_params"
 	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
@@ -663,7 +663,7 @@ func (this *LedgerStoreImp) SubmitBlock(block *types.Block, ccMsg *types.CrossCh
 	}
 
 	//data snapshot
-	err = this.Snapshot(utils.ConcatKey(utils.GovernanceContractAddress, governance.AUTHORIZE_INFO_POOL), view)
+	err = this.Snapshot(view)
 	if err != nil {
 		panic("snapshot panic")
 	}
@@ -692,7 +692,23 @@ func (this *LedgerStoreImp) getGovernanceView() (*governance.GovernanceView, err
 	return governanceView, nil
 }
 
-func (this *LedgerStoreImp) Snapshot(key []byte, view uint32) error {
+func (this *LedgerStoreImp) Snapshot(view uint32) error {
+	err := this.snapshotAuthorization(utils.ConcatKey(utils.GovernanceContractAddress, governance.AUTHORIZE_INFO_POOL), view)
+	if err != nil {
+		return fmt.Errorf("snapshotAuthorization error:%v", err)
+	}
+	viewBytes, err := governance.GetUint32Bytes(view)
+	if err != nil {
+		return fmt.Errorf("governance.GetUint32Bytes error:%v", err)
+	}
+	err = this.snapshotPeers(utils.ConcatKey(utils.GovernanceContractAddress, []byte(governance.PEER_POOL), viewBytes), view)
+	if err != nil {
+		return fmt.Errorf("snapshotPeers error:%v", err)
+	}
+	return nil
+}
+
+func (this *LedgerStoreImp) snapshotAuthorization(key []byte, view uint32) error {
 	prefix := make([]byte, 1+len(key))
 	prefix[0] = byte(scom.ST_STORAGE)
 	copy(prefix[1:], key)
@@ -716,6 +732,84 @@ func (this *LedgerStoreImp) Snapshot(key []byte, view uint32) error {
 	if err := iter.Error(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (this *LedgerStoreImp) snapshotPeers(key []byte, view uint32) error {
+	prefix := make([]byte, 1+len(key))
+	prefix[0] = byte(scom.ST_STORAGE)
+	copy(prefix[1:], key)
+	value, err := this.stateStore.store.Get(prefix)
+	if err != nil {
+		return fmt.Errorf("get value error:%v", err)
+	}
+	f, err := os.Create(fmt.Sprintf("Snapshot/%d_peers", view))
+	if err != nil {
+		return fmt.Errorf("os.Create error: %v", err)
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+
+	peerPoolMapStore, err := states.GetValueFromRawStorageItem(value)
+	if err != nil {
+		return fmt.Errorf("peerPoolMapStore is not available:%v", err)
+	}
+	peerPoolMap := new(governance.PeerPoolMap)
+	err = peerPoolMap.Deserialization(common.NewZeroCopySource(peerPoolMapStore))
+	if err != nil {
+		return fmt.Errorf("peerPoolMap.Deserialize error:%v", err)
+	}
+	var peerPoolItemList []*governance.PeerPoolItem
+	for _, v := range peerPoolMap.PeerPoolMap {
+		peerPoolItemList = append(peerPoolItemList, v)
+	}
+	sort.SliceStable(peerPoolItemList, func(i, j int) bool {
+		return peerPoolItemList[i].InitPos+peerPoolItemList[i].TotalPos >
+			peerPoolItemList[j].InitPos+peerPoolItemList[j].TotalPos
+	})
+	loop := 49
+	if len(peerPoolItemList) < 49 {
+		loop = len(peerPoolItemList)
+	}
+	for i := 0; i < loop; i++ {
+		peerPubkeyPrefix, err := hex.DecodeString(peerPoolItemList[i].PeerPubkey)
+		if err != nil {
+			return fmt.Errorf("hex.DecodeString, peerPubkey format error: %v", err)
+		}
+		key := utils.ConcatKey(utils.GovernanceContractAddress, []byte(governance.PEER_ATTRIBUTES), peerPubkeyPrefix)
+		prefix := make([]byte, 1+len(key))
+		prefix[0] = byte(scom.ST_STORAGE)
+		copy(prefix[1:], key)
+		value, err := this.stateStore.store.Get(prefix)
+		if err != nil {
+			return fmt.Errorf("get value error:%v", err)
+		}
+		peerAttributesStore, err := states.GetValueFromRawStorageItem(value)
+		if err != nil {
+			return fmt.Errorf("peerAttributesStore is not available:%v", err)
+		}
+		peerAttributes := new(governance.PeerAttributes)
+		err = peerAttributes.Deserialization(common.NewZeroCopySource(peerAttributesStore))
+		if err != nil {
+			return fmt.Errorf("peerAttributes.Deserialize error:%v", err)
+		}
+
+		w.WriteString(peerPoolItemList[i].PeerPubkey)
+		w.WriteString("\t")
+		w.WriteString(peerPoolItemList[i].Address.ToBase58())
+		w.WriteString("\t")
+		w.WriteString(strconv.Itoa(int(peerPoolItemList[i].Status)))
+		w.WriteString("\t")
+		w.WriteString(strconv.Itoa(int(peerPoolItemList[i].InitPos + peerPoolItemList[i].TotalPos)))
+		w.WriteString("\t")
+		w.WriteString(strconv.Itoa(int(peerPoolItemList[i].InitPos)))
+		w.WriteString("\t")
+		w.WriteString(strconv.Itoa(int(peerAttributes.TPeerCost)))
+		w.WriteString("\n")
+	}
+
+	w.Flush()
+
 	return nil
 }
 
@@ -770,7 +864,7 @@ func (this *LedgerStoreImp) AddBlock(block *types.Block, ccMsg *types.CrossChain
 	}
 
 	//data snapshot
-	err = this.Snapshot(utils.ConcatKey(utils.GovernanceContractAddress, governance.AUTHORIZE_INFO_POOL), view)
+	err = this.Snapshot(view)
 	if err != nil {
 		panic("snapshot panic")
 	}
