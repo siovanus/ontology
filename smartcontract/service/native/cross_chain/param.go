@@ -25,67 +25,49 @@ import (
 )
 
 type CreateCrossChainTxParam struct {
-	Fee     uint64
-	Address common.Address
-
-	ToChainID       uint64
-	ContractAddress common.Address
-	FunctionName    string
-	Args            []byte
+	ToChainID uint64
+	Fee       uint64
+	ToAddress string
+	Amount    uint64
 }
 
 func (this *CreateCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
-	utils.EncodeVarUint(sink, this.Fee)
-	utils.EncodeAddress(sink, this.Address)
-
 	utils.EncodeVarUint(sink, this.ToChainID)
-	utils.EncodeAddress(sink, this.ContractAddress)
-	utils.EncodeString(sink, this.FunctionName)
-	utils.EncodeVarBytes(sink, this.Args)
+	utils.EncodeVarUint(sink, this.Fee)
+	utils.EncodeString(sink, this.ToAddress)
+	utils.EncodeVarUint(sink, this.Amount)
 }
 
 func (this *CreateCrossChainTxParam) Deserialization(source *common.ZeroCopySource) error {
-	fee, err := utils.DecodeVarUint(source)
-	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize fee error:%s", err)
-	}
-	address, err := utils.DecodeAddress(source)
-	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize address error:%s", err)
-	}
-
 	toChainID, err := utils.DecodeVarUint(source)
 	if err != nil {
 		return fmt.Errorf("CreateCrossChainTxParam deserialize toChainID error:%s", err)
 	}
-	contractAddress, err := utils.DecodeAddress(source)
+	fee, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize contractAddress error:%s", err)
+		return fmt.Errorf("CreateCrossChainTxParam deserialize fee error:%s", err)
 	}
-	functionName, err := utils.DecodeString(source)
+	toAddress, err := utils.DecodeString(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize functionName error:%s", err)
+		return fmt.Errorf("CreateCrossChainTxParam deserialize address error:%s", err)
 	}
-	args, err := utils.DecodeVarBytes(source)
+	amount, err := utils.DecodeVarUint(source)
 	if err != nil {
-		return fmt.Errorf("CreateCrossChainTxParam deserialize args error:%s", err)
+		return fmt.Errorf("CreateCrossChainTxParam deserialize amount error:%s", err)
 	}
-	this.Fee = fee
-	this.Address = address
 
 	this.ToChainID = toChainID
-	this.ContractAddress = contractAddress
-	this.FunctionName = functionName
-	this.Args = args
+	this.Fee = fee
+	this.ToAddress = toAddress
+	this.Amount = amount
 	return nil
 }
 
 type ProcessCrossChainTxParam struct {
 	Address     common.Address
 	FromChainID uint64
-
-	Height uint32
-	Proof  string
+	Height      uint32
+	Proof       string
 }
 
 func (this *ProcessCrossChainTxParam) Serialization(sink *common.ZeroCopySink) {
@@ -116,5 +98,36 @@ func (this *ProcessCrossChainTxParam) Deserialization(source *common.ZeroCopySou
 	this.FromChainID = fromChainID
 	this.Height = uint32(height)
 	this.Proof = proof
+	return nil
+}
+
+type OngUnlockParam struct {
+	FromChainID uint64
+	Address     common.Address
+	Amount      uint64
+}
+
+func (this *OngUnlockParam) Serialization(sink *common.ZeroCopySink) {
+	utils.EncodeVarUint(sink, this.FromChainID)
+	utils.EncodeAddress(sink, this.Address)
+	utils.EncodeVarUint(sink, this.Amount)
+}
+
+func (this *OngUnlockParam) Deserialization(source *common.ZeroCopySource) error {
+	fromChainID, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("OngLockParam deserialize fromChainID error:%s", err)
+	}
+	address, err := utils.DecodeAddress(source)
+	if err != nil {
+		return fmt.Errorf("OngLockParam deserialize address error:%s", err)
+	}
+	amount, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("OngLockParam deserialize amount error:%s", err)
+	}
+	this.FromChainID = fromChainID
+	this.Address = address
+	this.Amount = amount
 	return nil
 }

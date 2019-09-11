@@ -48,7 +48,6 @@ func init() {
 	ontid.Init()
 	auth.Init()
 	governance.InitGovernance()
-	chain_manager.InitChainManager()
 	cross_chain.InitCrossChain()
 	header_sync.InitHeaderSync()
 }

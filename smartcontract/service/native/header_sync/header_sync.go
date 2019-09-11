@@ -19,10 +19,11 @@
 package header_sync
 
 import (
-	"fmt"
-
 	"encoding/hex"
+	"fmt"
+	atypes "github.com/ontio/multi-chain/core/types"
 	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/types"
 	"github.com/ontio/ontology/merkle"
 	"github.com/ontio/ontology/smartcontract/service/native"
@@ -31,6 +32,7 @@ import (
 
 const (
 	//function name
+	SYNC_GENESIS_HEADER  = "syncGenesisHeader"
 	SYNC_BLOCK_HEADER    = "syncBlockHeader"
 	SYNC_CONSENSUS_PEERS = "syncConsensusPeers"
 
@@ -51,8 +53,45 @@ func InitHeaderSync() {
 
 //Register methods of governance contract
 func RegisterHeaderSyncContract(native *native.NativeService) {
+	native.Register(SYNC_GENESIS_HEADER, SyncGenesisHeader)
 	native.Register(SYNC_BLOCK_HEADER, SyncBlockHeader)
 	native.Register(SYNC_CONSENSUS_PEERS, SyncConsensusPeers)
+}
+
+func SyncGenesisHeader(native *native.NativeService) ([]byte, error) {
+	params := new(SyncGenesisHeaderParam)
+	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, contract params deserialize error: %v", err)
+	}
+
+	// get operator from database
+	operatorAddress, err := types.AddressFromBookkeepers(genesis.GenesisBookkeepers)
+	if err != nil {
+		return utils.BYTE_FALSE, err
+	}
+
+	//check witness
+	err = utils.ValidateOwner(native, operatorAddress)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, checkWitness error: %v", err)
+	}
+
+	header, err := atypes.HeaderFromRawBytes(params.GenesisHeader)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, deserialize header err: %v", err)
+	}
+	//block header storage
+	err = PutBlockHeader(native, header)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, put blockHeader error: %v", err)
+	}
+
+	//consensus node pk storage
+	err = UpdateConsensusPeer(native, header, operatorAddress)
+	if err != nil {
+		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, update ConsensusPeer error: %v", err)
+	}
+	return utils.BYTE_TRUE, nil
 }
 
 func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
@@ -67,7 +106,7 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		}
 		_, err = GetHeaderByHeight(native, header.ShardID, header.Height)
 		if err == nil {
-			continue
+			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, %d, %d", header.ShardID, header.Height)
 		}
 		err = verifyHeader(native, header)
 		if err != nil {

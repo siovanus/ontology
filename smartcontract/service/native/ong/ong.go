@@ -26,16 +26,9 @@ import (
 	"github.com/ontio/ontology/common/constants"
 	"github.com/ontio/ontology/errors"
 	"github.com/ontio/ontology/smartcontract/service/native"
-	"github.com/ontio/ontology/smartcontract/service/native/chain_manager"
-	"github.com/ontio/ontology/smartcontract/service/native/cross_chain"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/vm/neovm/types"
-)
-
-const (
-	ONG_LOCK   = "ongLock"
-	ONG_UNLOCK = "ongUnlock"
 )
 
 func InitOng() {
@@ -53,8 +46,6 @@ func RegisterOngContract(native *native.NativeService) {
 	native.Register(ont.TOTALSUPPLY_NAME, OngTotalSupply)
 	native.Register(ont.BALANCEOF_NAME, OngBalanceOf)
 	native.Register(ont.ALLOWANCE_NAME, OngAllowance)
-	native.Register(ONG_LOCK, OngLock)
-	native.Register(ONG_UNLOCK, OngUnlock)
 }
 
 func OngInit(native *native.NativeService) ([]byte, error) {
@@ -164,130 +155,4 @@ func OngBalanceOf(native *native.NativeService) ([]byte, error) {
 
 func OngAllowance(native *native.NativeService) ([]byte, error) {
 	return ont.GetBalanceValue(native, ont.APPROVE_FLAG)
-}
-
-func OngLock(native *native.NativeService) ([]byte, error) {
-	params := new(OngLockParam)
-	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, contract params deserialize error: %v", err)
-	}
-	contract := native.ContextRef.CurrentContext().ContractAddress
-
-	//check witness
-	err := utils.ValidateOwner(native, params.Address)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, checkWitness error: %v", err)
-	}
-
-	//update side chain
-	sideChain, err := chain_manager.GetSideChain(native, params.ToChainID)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, get sideChain error: %v", err)
-	}
-	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, side chain status is not normal status")
-	}
-	ongAmount, ok := common.SafeMul(uint64(params.Amount), sideChain.Ratio)
-	if ok {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, number is more than uint64")
-	}
-	sideChain.OngNum = sideChain.OngNum + ongAmount
-	if sideChain.OngNum > sideChain.OngPool {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong num in pool is full")
-	}
-	err = putSideChain(native, sideChain)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, put sideChain error: %v", err)
-	}
-
-	//ong transfer
-	err = appCallTransferOng(native, params.Address, utils.CrossChainContractAddress, ongAmount)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngLock, ong transfer error: %v", err)
-	}
-	notifyOngLock(native, contract, params.ToChainID, params.Address, ongAmount)
-
-	//call cross chain governance contract
-	ongUnlockParam := &OngUnlockParam{
-		FromChainID: native.ShardID.ToUint64(),
-		Address:     params.Address,
-		Amount:      params.Amount,
-	}
-	args := common.NewZeroCopySink(nil)
-	ongUnlockParam.Serialization(args)
-	crossChainParam := cross_chain.CreateCrossChainTxParam{
-		Fee:             params.Fee,
-		Address:         params.Address,
-		ToChainID:       params.ToChainID,
-		ContractAddress: utils.OngContractAddress,
-		FunctionName:    "ongUnlock",
-		Args:            args.Bytes(),
-	}
-	sink := common.NewZeroCopySink(nil)
-	crossChainParam.Serialization(sink)
-	if _, err := native.NativeCall(utils.CrossChainContractAddress, cross_chain.CREATE_CROSS_CHAIN_TX, sink.Bytes()); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("appCallTransfer, appCall error: %v", err)
-	}
-
-	return utils.BYTE_TRUE, nil
-}
-
-func OngUnlock(native *native.NativeService) ([]byte, error) {
-	params := new(OngUnlockParam)
-	err := params.Deserialization(common.NewZeroCopySource(native.Input))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, raw.Deserialization error: %v", err)
-	}
-	contract := native.ContextRef.CurrentContext().ContractAddress
-
-	//check witness, only cross chain contract can call
-	if native.ContextRef.CallingContext().ContractAddress != utils.CrossChainContractAddress {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, only cross chain contract can invoke")
-	}
-
-	//ong unlock
-	//get side chain
-	sideChain, err := chain_manager.GetSideChain(native, params.FromChainID)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, get sideChain error: %v", err)
-	}
-	if sideChain.Status != chain_manager.SideChainStatus && sideChain.Status != chain_manager.QuitingStatus {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, side chain status is not normal status")
-	}
-	ongAmount, ok := common.SafeMul(uint64(params.Amount), sideChain.Ratio)
-	if ok {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, number is more than uint64")
-	}
-	if sideChain.OngNum < ongAmount {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, ong num in pool is not enough")
-	}
-	sideChain.OngNum = sideChain.OngNum - ongAmount
-	err = putSideChain(native, sideChain)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, put sideChain error: %v", err)
-	}
-	//ong transfer
-	//can not invoke transfer because ong contract want to transfer cross chain contract's asset
-	//err = appCallTransferOng(native, utils.CrossChainContractAddress, params.Address, ongAmount)
-	//if err != nil {
-	//	return utils.BYTE_FALSE, fmt.Errorf("ProcessCrossChainTx, appCallTransferOng ong transfer error: %v", err)
-	//}
-	value1, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, utils.GetStorageUInt64 error: %v", err)
-	}
-	if value1 < ongAmount {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, balance of CrossChainContractAddress insuffient")
-	}
-	item1 := utils.GenUInt64StorageItem(value1 - ongAmount)
-	native.CacheDB.Put(append(utils.OngContractAddress[:], utils.CrossChainContractAddress[:]...), item1.ToArray())
-	value2, err := utils.GetStorageUInt64(native, append(utils.OngContractAddress[:], params.Address[:]...))
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("OngUnlock, utils.GetStorageUInt64 error: %v", err)
-	}
-	item2 := utils.GenUInt64StorageItem(value2 + ongAmount)
-	native.CacheDB.Put(append(utils.OngContractAddress[:], params.Address[:]...), item2.ToArray())
-
-	notifyOngUnlock(native, contract, params.FromChainID, params.Address, ongAmount)
-	return utils.BYTE_TRUE, nil
 }
