@@ -19,22 +19,19 @@
 package header_sync
 
 import (
-	"encoding/hex"
 	"fmt"
-	atypes "github.com/ontio/multi-chain/core/types"
+
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/types"
-	"github.com/ontio/ontology/merkle"
 	"github.com/ontio/ontology/smartcontract/service/native"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
 const (
 	//function name
-	SYNC_GENESIS_HEADER  = "syncGenesisHeader"
-	SYNC_BLOCK_HEADER    = "syncBlockHeader"
-	SYNC_CONSENSUS_PEERS = "syncConsensusPeers"
+	SYNC_GENESIS_HEADER = "syncGenesisHeader"
+	SYNC_BLOCK_HEADER   = "syncBlockHeader"
 
 	//key prefix
 	BLOCK_HEADER                = "blockHeader"
@@ -43,7 +40,6 @@ const (
 	CONSENSUS_PEER              = "consensusPeer"
 	CONSENSUS_PEER_BLOCK_HEIGHT = "consensusPeerBlockHeight"
 	KEY_HEIGHTS                 = "keyHeights"
-	SYNC_ADDRESS                = "syncAddress"
 )
 
 //Init governance contract address
@@ -55,7 +51,6 @@ func InitHeaderSync() {
 func RegisterHeaderSyncContract(native *native.NativeService) {
 	native.Register(SYNC_GENESIS_HEADER, SyncGenesisHeader)
 	native.Register(SYNC_BLOCK_HEADER, SyncBlockHeader)
-	native.Register(SYNC_CONSENSUS_PEERS, SyncConsensusPeers)
 }
 
 func SyncGenesisHeader(native *native.NativeService) ([]byte, error) {
@@ -76,7 +71,7 @@ func SyncGenesisHeader(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, checkWitness error: %v", err)
 	}
 
-	header, err := atypes.HeaderFromRawBytes(params.GenesisHeader)
+	header, err := types.HeaderFromRawBytes(params.GenesisHeader)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, deserialize header err: %v", err)
 	}
@@ -87,7 +82,7 @@ func SyncGenesisHeader(native *native.NativeService) ([]byte, error) {
 	}
 
 	//consensus node pk storage
-	err = UpdateConsensusPeer(native, header, operatorAddress)
+	err = UpdateConsensusPeer(native, header)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, update ConsensusPeer error: %v", err)
 	}
@@ -116,59 +111,10 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, put BlockHeader error: %v", err)
 		}
-		err = UpdateConsensusPeer(native, header, params.Address)
+		err = UpdateConsensusPeer(native, header)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, update ConsensusPeer error: %v", err)
 		}
 	}
-	return utils.BYTE_TRUE, nil
-}
-
-func SyncConsensusPeers(native *native.NativeService) ([]byte, error) {
-	params := new(SyncConsensusPeerParam)
-	if err := params.Deserialization(common.NewZeroCopySource(native.Input)); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, contract params deserialize error: %v", err)
-	}
-
-	header, err := types.HeaderFromRawBytes(params.Header)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, types.HeaderFromRawBytes error: %v", err)
-	}
-	err = verifyHeader(native, header)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, verifyHeader error: %v", err)
-	}
-
-	path, err := hex.DecodeString(params.Proof)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, proof hex.DecodeString error: %v", err)
-	}
-	v := merkle.MerkleProve(path, header.CrossStatesRoot)
-	if v == nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, merkle.MerkleProve verify merkle proof error")
-	}
-	consensusPeers := &ConsensusPeers{
-		PeerMap: make(map[string]*Peer),
-	}
-	s := common.NewZeroCopySource(v)
-	if err := consensusPeers.Deserialization(s); err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, deserialize consensusPeers error:%s", err)
-	}
-	ok, err := checkIfConsensusPeersSynced(native, consensusPeers.ChainID, header.Height)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, checkIfConsensusPeersSynced error: %v", err)
-	}
-	if ok {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, consensusPeers are already synced")
-	}
-	err = putConsensusPeers(native, consensusPeers)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("SyncConsensusPeers, put ConsensusPeers error: %s", err)
-	}
-	err = putSyncAddress(native, consensusPeers.ChainID, params.Address)
-	if err != nil {
-		return utils.BYTE_FALSE, fmt.Errorf("updateConsensusPeer, put SyncAddress eerror: %s", err)
-	}
-
 	return utils.BYTE_TRUE, nil
 }

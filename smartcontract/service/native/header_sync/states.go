@@ -20,10 +20,11 @@ package header_sync
 
 import (
 	"fmt"
-	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/native/service/utils"
 	"math"
 	"sort"
+
+	"github.com/ontio/ontology/common"
+	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
 type Peer struct {
@@ -32,14 +33,14 @@ type Peer struct {
 }
 
 func (this *Peer) Serialization(sink *common.ZeroCopySink) {
-	sink.WriteUint32(this.Index)
-	sink.WriteVarBytes([]byte(this.PeerPubkey))
+	utils.EncodeVarUint(sink, uint64(this.Index))
+	utils.EncodeString(sink, this.PeerPubkey)
 }
 
 func (this *Peer) Deserialization(source *common.ZeroCopySource) error {
-	index, eof := source.NextUint32()
-	if eof {
-		return fmt.Errorf("utils.DecodeVarUint, deserialize index error")
+	index, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize index error: %v", err)
 	}
 	if index > math.MaxUint32 {
 		return fmt.Errorf("deserialize index error: index more than max uint32")
@@ -62,22 +63,22 @@ func (this *KeyHeights) Serialization(sink *common.ZeroCopySink) {
 	sort.SliceStable(this.HeightList, func(i, j int) bool {
 		return this.HeightList[i] > this.HeightList[j]
 	})
-	sink.WriteVarUint(uint64(len(this.HeightList)))
+	utils.EncodeVarUint(sink, uint64(len(this.HeightList)))
 	for _, v := range this.HeightList {
-		sink.WriteUint32(v)
+		utils.EncodeVarUint(sink, uint64(v))
 	}
 }
 
 func (this *KeyHeights) Deserialization(source *common.ZeroCopySource) error {
-	n, eof := source.NextVarUint()
-	if eof {
-		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error")
+	n, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error: %v", err)
 	}
 	heightList := make([]uint32, 0)
 	for i := 0; uint64(i) < n; i++ {
-		height, eof := source.NextUint32()
-		if eof {
-			return fmt.Errorf("utils.DecodeVarUint, deserialize height error")
+		height, err := utils.DecodeVarUint(source)
+		if err != nil {
+			return fmt.Errorf("utils.DecodeVarUint, deserialize height error: %v", err)
 		}
 		if height > math.MaxUint32 {
 			return fmt.Errorf("deserialize height error: height more than max uint32")
@@ -95,9 +96,9 @@ type ConsensusPeers struct {
 }
 
 func (this *ConsensusPeers) Serialization(sink *common.ZeroCopySink) {
-	sink.WriteUint64(this.ChainID)
-	sink.WriteUint32(this.Height)
-	sink.WriteVarUint(uint64(len(this.PeerMap)))
+	utils.EncodeVarUint(sink, this.ChainID)
+	utils.EncodeVarUint(sink, uint64(this.Height))
+	utils.EncodeVarUint(sink, uint64(len(this.PeerMap)))
 	var peerList []*Peer
 	for _, v := range this.PeerMap {
 		peerList = append(peerList, v)
@@ -111,20 +112,20 @@ func (this *ConsensusPeers) Serialization(sink *common.ZeroCopySink) {
 }
 
 func (this *ConsensusPeers) Deserialization(source *common.ZeroCopySource) error {
-	chainID, eof := source.NextUint64()
-	if eof {
-		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error")
+	chainID, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize chainID error: %v", err)
 	}
-	height, eof := source.NextUint32()
-	if eof {
-		return fmt.Errorf("utils.DecodeVarUint, deserialize height error")
+	height, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize height error: %v", err)
 	}
 	if height > math.MaxUint32 {
 		return fmt.Errorf("deserialize height error: height more than max uint32")
 	}
-	n, eof := source.NextVarUint()
-	if eof {
-		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error")
+	n, err := utils.DecodeVarUint(source)
+	if err != nil {
+		return fmt.Errorf("utils.DecodeVarUint, deserialize HeightList length error: %v", err)
 	}
 	peerMap := make(map[string]*Peer)
 	for i := 0; uint64(i) < n; i++ {
