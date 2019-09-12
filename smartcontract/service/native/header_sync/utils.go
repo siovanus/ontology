@@ -19,9 +19,11 @@
 package header_sync
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
+	mtypes "github.com/ontio/multi-chain/core/types"
 	"github.com/ontio/ontology/common"
 	vconfig "github.com/ontio/ontology/consensus/vbft/config"
 	"github.com/ontio/ontology/core/signature"
@@ -31,10 +33,13 @@ import (
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
 
-func PutBlockHeader(native *native.NativeService, blockHeader *types.Header) error {
+func PutBlockHeader(native *native.NativeService, blockHeader *mtypes.Header) error {
 	contract := utils.HeaderSyncContractAddress
-	sink := common.NewZeroCopySink(nil)
-	blockHeader.Serialization(sink)
+	buf := bytes.NewBuffer(nil)
+	err := blockHeader.Serialize(buf)
+	if err != nil {
+		return fmt.Errorf("PutBlockHeader, blockHeader.Serializ error: %v", err)
+	}
 	chainIDBytes, err := utils.GetUint64Bytes(blockHeader.ChainID)
 	if err != nil {
 		return fmt.Errorf("chainIDBytes, GetUint64Bytes error: %v", err)
@@ -45,7 +50,7 @@ func PutBlockHeader(native *native.NativeService, blockHeader *types.Header) err
 	}
 	blockHash := blockHeader.Hash()
 	native.CacheDB.Put(utils.ConcatKey(contract, []byte(BLOCK_HEADER), chainIDBytes, blockHash.ToArray()),
-		cstates.GenRawStorageItem(sink.Bytes()))
+		cstates.GenRawStorageItem(buf.Bytes()))
 	native.CacheDB.Put(utils.ConcatKey(contract, []byte(HEADER_INDEX), chainIDBytes, heightBytes),
 		cstates.GenRawStorageItem(blockHash.ToArray()))
 	native.CacheDB.Put(utils.ConcatKey(contract, []byte(CURRENT_HEIGHT), chainIDBytes), cstates.GenRawStorageItem(heightBytes))
@@ -117,7 +122,7 @@ func GetHeaderByHash(native *native.NativeService, chainID uint64, hash common.U
 
 //verify header of any height
 //find key height and get consensus peer first, then check the sign
-func verifyHeader(native *native.NativeService, header *types.Header) error {
+func verifyHeader(native *native.NativeService, header *mtypes.Header) error {
 	height := header.Height
 	//search consensus peer
 	keyHeight, err := findKeyHeight(native, height, header.ChainID)
@@ -251,7 +256,7 @@ func putConsensusPeers(native *native.NativeService, consensusPeers *ConsensusPe
 	return nil
 }
 
-func UpdateConsensusPeer(native *native.NativeService, header *types.Header) error {
+func UpdateConsensusPeer(native *native.NativeService, header *mtypes.Header) error {
 	blkInfo := &vconfig.VbftBlockInfo{}
 	if err := json.Unmarshal(header.ConsensusPayload, blkInfo); err != nil {
 		return fmt.Errorf("updateConsensusPeer, unmarshal blockInfo error: %s", err)

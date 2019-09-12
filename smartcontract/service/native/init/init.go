@@ -24,7 +24,6 @@ import (
 
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/smartcontract/service/native/auth"
-	"github.com/ontio/ontology/smartcontract/service/native/chain_manager"
 	"github.com/ontio/ontology/smartcontract/service/native/cross_chain"
 	params "github.com/ontio/ontology/smartcontract/service/native/global_params"
 	"github.com/ontio/ontology/smartcontract/service/native/governance"

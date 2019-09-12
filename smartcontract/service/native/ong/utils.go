@@ -22,27 +22,10 @@ import (
 	"fmt"
 
 	"github.com/ontio/ontology/common"
-	"github.com/ontio/ontology/common/config"
-	cstates "github.com/ontio/ontology/core/states"
-	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native"
-	"github.com/ontio/ontology/smartcontract/service/native/chain_manager"
 	"github.com/ontio/ontology/smartcontract/service/native/ont"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
 )
-
-func putSideChain(native *native.NativeService, sideChain *chain_manager.SideChain) error {
-	contract := utils.ChainManagerContractAddress
-	sink := common.NewZeroCopySink(nil)
-	sideChain.Serialize(sink)
-	chainIDBytes, err := utils.GetUint64Bytes(sideChain.ChainID)
-	if err != nil {
-		return fmt.Errorf("getUint64Bytes error: %v", err)
-	}
-	native.CacheDB.Put(utils.ConcatKey(contract, []byte(chain_manager.SIDE_CHAIN), chainIDBytes),
-		cstates.GenRawStorageItem(sink.Bytes()))
-	return nil
-}
 
 func appCallTransferOng(native *native.NativeService, from common.Address, to common.Address, amount uint64) error {
 	err := appCallTransfer(native, utils.OngContractAddress, from, to, amount)
@@ -69,28 +52,4 @@ func appCallTransfer(native *native.NativeService, contract common.Address, from
 		return fmt.Errorf("appCallTransfer, appCall error: %v", err)
 	}
 	return nil
-}
-
-func notifyOngLock(native *native.NativeService, contract common.Address, chainID uint64,
-	address common.Address, ongxAmount uint64) {
-	if !config.DefConfig.Common.EnableEventLog {
-		return
-	}
-	native.Notifications = append(native.Notifications,
-		&event.NotifyEventInfo{
-			ContractAddress: contract,
-			States:          []interface{}{ONG_LOCK, chainID, address.ToBase58(), ongxAmount},
-		})
-}
-
-func notifyOngUnlock(native *native.NativeService, contract common.Address, chainID uint64,
-	address common.Address, ongAmount uint64) {
-	if !config.DefConfig.Common.EnableEventLog {
-		return
-	}
-	native.Notifications = append(native.Notifications,
-		&event.NotifyEventInfo{
-			ContractAddress: contract,
-			States:          []interface{}{ONG_UNLOCK, chainID, address.ToBase58(), ongAmount},
-		})
 }

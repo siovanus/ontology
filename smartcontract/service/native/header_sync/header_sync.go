@@ -21,6 +21,7 @@ package header_sync
 import (
 	"fmt"
 
+	mtypes "github.com/ontio/multi-chain/core/types"
 	"github.com/ontio/ontology/common"
 	"github.com/ontio/ontology/core/genesis"
 	"github.com/ontio/ontology/core/types"
@@ -71,7 +72,7 @@ func SyncGenesisHeader(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, checkWitness error: %v", err)
 	}
 
-	header, err := types.HeaderFromRawBytes(params.GenesisHeader)
+	header, err := mtypes.HeaderFromRawBytes(params.GenesisHeader)
 	if err != nil {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncGenesisHeader, deserialize header err: %v", err)
 	}
@@ -95,13 +96,13 @@ func SyncBlockHeader(native *native.NativeService) ([]byte, error) {
 		return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, contract params deserialize error: %v", err)
 	}
 	for _, v := range params.Headers {
-		header, err := types.HeaderFromRawBytes(v)
+		header, err := mtypes.HeaderFromRawBytes(v)
 		if err != nil {
 			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, new_types.HeaderFromRawBytes error: %v", err)
 		}
-		_, err = GetHeaderByHeight(native, header.ShardID, header.Height)
+		_, err = GetHeaderByHeight(native, header.ChainID, header.Height)
 		if err == nil {
-			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, %d, %d", header.ShardID, header.Height)
+			return utils.BYTE_FALSE, fmt.Errorf("SyncBlockHeader, %d, %d", header.ChainID, header.Height)
 		}
 		err = verifyHeader(native, header)
 		if err != nil {
