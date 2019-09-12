@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/ontio/ontology/common"
 	"io"
 	"math"
 )
@@ -295,6 +296,22 @@ func ReadBool(reader io.Reader) (bool, error) {
 	var x bool
 	err := binary.Read(reader, binary.LittleEndian, &x)
 	return x, err
+}
+
+func ReadHash(reader io.Reader) (common.Uint256, error) {
+	val, err := ReadVarBytes(reader)
+	if err != nil {
+		return common.UINT256_EMPTY, err
+	}
+	return common.Uint256ParseFromBytes(val)
+}
+
+func ReadAddress(reader io.Reader) (common.Address, error) {
+	val, err := ReadVarBytes(reader)
+	if err != nil {
+		return common.ADDRESS_EMPTY, err
+	}
+	return common.AddressParseFromBytes(val)
 }
 
 func WriteByte(writer io.Writer, val byte) error {
