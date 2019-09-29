@@ -106,8 +106,6 @@ func setupAPP() *cli.App {
 		utils.ReservedPeersFileFlag,
 		utils.NetworkIdFlag,
 		utils.NodePortFlag,
-		utils.ConsensusPortFlag,
-		utils.DualPortSupportFlag,
 		utils.MaxConnInBoundFlag,
 		utils.MaxConnOutBoundFlag,
 		utils.MaxConnInBoundForSingleIPFlag,
@@ -234,7 +232,7 @@ func initLedger(ctx *cli.Context) (*ledger.Ledger, error) {
 
 	var err error
 	dbDir := utils.GetStoreDirPath(config.DefConfig.Common.DataDir, config.DefConfig.P2PNode.NetworkName)
-	ledger.DefLedger, err = ledger.NewLedger(dbDir)
+	ledger.DefLedger, err = ledger.NewLedger(dbDir, 1)
 	if err != nil {
 		return nil, fmt.Errorf("NewLedger error:%s", err)
 	}

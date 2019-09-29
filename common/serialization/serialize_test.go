@@ -210,3 +210,12 @@ func BenchmarkBytesXReader(b *testing.B) {
 		byteXReader(buff, uint64(len(bs)))
 	}
 }
+
+func Test(t *testing.T) {
+	a := make([]int, 0, 512)
+	a = a[:200]
+	c := cap(a)
+	l := len(a)
+	fmt.Println(c)
+	fmt.Println(l)
+}
