@@ -54,7 +54,6 @@ import (
 	"github.com/ontio/ontology/smartcontract/event"
 	"github.com/ontio/ontology/smartcontract/service/native/governance"
 	"github.com/ontio/ontology/smartcontract/service/native/utils"
-	"github.com/ontio/ontology/smartcontract/service/native/utils"
 	"github.com/ontio/ontology/smartcontract/service/neovm"
 	"github.com/ontio/ontology/smartcontract/service/wasmvm"
 	sstate "github.com/ontio/ontology/smartcontract/states"
@@ -697,10 +696,7 @@ func (this *LedgerStoreImp) Snapshot(view uint32) error {
 	if err != nil {
 		return fmt.Errorf("snapshotAuthorization error:%v", err)
 	}
-	viewBytes, err := governance.GetUint32Bytes(view)
-	if err != nil {
-		return fmt.Errorf("governance.GetUint32Bytes error:%v", err)
-	}
+	viewBytes := governance.GetUint32Bytes(view)
 	err = this.snapshotPeers(utils.ConcatKey(utils.GovernanceContractAddress, []byte(governance.PEER_POOL), viewBytes), view)
 	if err != nil {
 		return fmt.Errorf("snapshotPeers error:%v", err)
